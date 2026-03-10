@@ -1,0 +1,42 @@
+import { Link } from 'react-router-dom';
+import VideoPlayer from '../components/VideoPlayer';
+import ViewerCount from '../components/ViewerCount';
+import Chat from '../components/Chat';
+import { useChat } from '../hooks/useChat';
+import { useStreamState } from '../hooks/useStreamState';
+
+export default function Room() {
+    const { messages, sendMessage, deleteMessage } = useChat();
+    const stream = useStreamState();
+
+    const handleSendMessage = (text: string) => {
+        sendMessage(text);
+    };
+
+    return (
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-[calc(100vh-8rem)] relative">
+            {/* Background glowing effects */}
+            <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-arg-celeste/10 rounded-full blur-[120px] pointer-events-none" />
+            <div className="absolute bottom-0 right-1/4 w-[600px] h-[600px] bg-arg-dorado/5 rounded-full blur-[150px] pointer-events-none" />
+
+            {/* Columna Izquierda: Video */}
+            <div className="lg:col-span-3 flex flex-col gap-4 z-10">
+                <VideoPlayer
+                    playbackId={stream.mux_playback_id || 'vweT28M0101Q01qjD7kC9T500QIfH1fN9xN700L7Fv5bK1Yg'} // Fallback a mock si no hay ID para testear diseño
+                    isLive={stream.is_live}
+                    title={stream.titulo}
+                />
+            </div>
+
+            {/* Columna Derecha: Chat */}
+            <div className="lg:col-span-1 h-full max-h-[600px] lg:max-h-none z-10">
+                <Chat
+                    messages={messages}
+                    onSendMessage={handleSendMessage}
+                    isAdminOrMod={true} // Por ahora hardcodeado, luego depende de Auth
+                    onDeleteMessage={deleteMessage}
+                />
+            </div>
+        </div>
+    );
+}
