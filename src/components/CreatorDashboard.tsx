@@ -23,17 +23,23 @@ export default function CreatorDashboard() {
       const { data, error } = await supabase.functions.invoke("create-stream");
 
       if (error) {
-        throw new Error(error.message);
+        console.error("Edge Function error:", error);
+        throw new Error(error.message || "Error en la Edge Function");
       }
 
-      if (!data) {
-        throw new Error("La función no devolvió datos");
+      if (!data || !data.stream_key || !data.playback_id) {
+        console.error("Respuesta inválida:", data);
+        throw new Error("La función no devolvió los datos esperados");
       }
 
-      // guardar info del stream en el estado del componente
-      setStreamInfo(data);
+      // guardar info del stream en el estado
+      setStreamInfo({
+        stream_id: data.stream_id,
+        stream_key: data.stream_key,
+        playback_id: data.playback_id,
+      });
 
-      // 🔹 guardar playback_id automáticamente en Supabase
+      // guardar playback_id en la base
       const { error: dbError } = await supabase
         .from("stream_estado")
         .update({
