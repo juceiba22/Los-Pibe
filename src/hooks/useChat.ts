@@ -22,10 +22,10 @@ export function useChat() {
                 .select(`
           id,
           user_id,
+          username,
           mensaje,
           is_deleted,
-          created_at,
-          perfiles ( username )
+          created_at
         `)
                 .order('created_at', { ascending: true })
                 .limit(100);
@@ -34,7 +34,7 @@ export function useChat() {
                 const formatted = data.map((d: any) => ({
                     id: d.id,
                     user_id: d.user_id,
-                    username: d.perfiles?.username || 'Anónimo',
+                    username: d.username,
                     mensaje: d.mensaje,
                     is_deleted: d.is_deleted,
                     time: new Date(d.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
@@ -52,22 +52,21 @@ export function useChat() {
                 'postgres_changes',
                 { event: 'INSERT', schema: 'public', table: 'chat_mensajes' },
                 async (payload: any) => {
-                    // Fetch username for new message
-                    const { data: profile } = await supabase
-                        .from('perfiles')
-                        .select('username')
-                        .eq('id', payload.new.user_id)
-                        .single();
-
-                    const newMsg: Message = {
-                        id: payload.new.id,
-                        user_id: payload.new.user_id,
-                        username: profile?.username || 'Anónimo',
-                        mensaje: payload.new.mensaje,
-                        is_deleted: payload.new.is_deleted,
-                        time: new Date(payload.new.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
-                    };
-                    setMessages(prev => [...prev, newMsg]);
+                    // Check if we already added it via optimistic UI
+                    setMessages(prev => {
+                        if (prev.some(m => m.id === payload.new.id || (m.mensaje === payload.new.mensaje && m.user_id === payload.new.user_id))) {
+                            return prev;
+                        }
+                        const newMsg: Message = {
+                            id: payload.new.id,
+                            user_id: payload.new.user_id,
+                            username: payload.new.username,
+                            mensaje: payload.new.mensaje,
+                            is_deleted: payload.new.is_deleted,
+                            time: new Date(payload.new.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
+                        };
+                        return [...prev, newMsg];
+                    });
                 }
             )
             .on(
@@ -87,23 +86,34 @@ export function useChat() {
     }, []);
 
     const sendMessage = async (mensaje: string, userId: string = 'me') => {
-        // En el MVP sin Auth, simularemos el usuario
-        if (userId === 'me') {
-            // Temporary optimistic UI for local user without strict auth
-            const tempId = Math.random().toString(36).substring(7);
-            const newMsg: Message = {
-                id: tempId,
-                user_id: 'me',
-                username: 'Vos',
-                mensaje,
-                is_deleted: false,
-                time: new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
-            };
-            setMessages(prev => [...prev, newMsg]);
-            return;
-            // Cuando Auth esté listo, haremos el INSERT:
-            // await supabase.from('chat_mensajes').insert([{ user_id: userId, mensaje }]);
+        let localUserId = localStorage.getItem('local_user_id') || '';
+        let localUserName = localStorage.getItem('local_username') || '';
+
+        if (!localUserId) {
+            localUserId = 'user_' + Math.random().toString(36).substring(7);
+            localUserName = 'Pibe_' + Math.floor(Math.random() * 1000);
+            localStorage.setItem('local_user_id', localUserId);
+            localStorage.setItem('local_username', localUserName);
         }
+
+        // Temporary optimistic UI for local user
+        const tempId = Math.random().toString(36).substring(7);
+        const newMsg: Message = {
+            id: tempId,
+            user_id: localUserId,
+            username: localUserName, // Shown as own name instantly
+            mensaje,
+            is_deleted: false,
+            time: new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
+        };
+        setMessages(prev => [...prev, newMsg]);
+
+        // Guardar en Supabase para que llegue a las otras ventanas
+        await supabase.from('chat_mensajes').insert([{
+            user_id: localUserId,
+            username: localUserName,
+            mensaje
+        }]);
     };
 
     const deleteMessage = async (id: string) => {

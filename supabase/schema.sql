@@ -1,6 +1,6 @@
 -- 1. Usuarios (Se maneja automáticamente a través de Supabase Auth, pero extendemos su perfil)
 CREATE TABLE perfiles (
-  id UUID REFERENCES auth.users(id) PRIMARY KEY,
+  id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
   username TEXT UNIQUE NOT NULL,
   rol TEXT DEFAULT 'viewer' CHECK (rol IN ('viewer', 'moderator', 'admin')),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -21,7 +21,8 @@ INSERT INTO stream_estado (id, titulo, is_live, mux_playback_id) VALUES (1, 'Tra
 -- 3. Mensajes del Chat
 CREATE TABLE chat_mensajes (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id UUID REFERENCES perfiles(id) NOT NULL,
+  user_id TEXT NOT NULL, -- MVP: Cambiado a TEXT para permitir usuarios anónimos
+  username TEXT NOT NULL DEFAULT 'Anónimo', -- MVP: Guardamos el nombre directamente
   mensaje TEXT NOT NULL,
   is_deleted BOOLEAN DEFAULT false,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -38,10 +39,9 @@ CREATE POLICY "Usuarios pueden actualizar su propio perfil" ON perfiles FOR UPDA
 
 -- Políticas para 'stream_estado'
 CREATE POLICY "Estado del stream público para lectura" ON stream_estado FOR SELECT USING (true);
--- Deberíamos asegurar que solo admins actualicen el estado, pero para el MVP dejaremos abierto o con un check simple.
+CREATE POLICY "Admins actualizan stream" ON stream_estado FOR UPDATE USING (true); -- MVP abierto
 
 -- Políticas para 'chat_mensajes'
-CREATE POLICY "Mensajes públicos para lectura" ON chat_mensajes FOR SELECT USING (is_deleted = false OR (SELECT rol FROM perfiles WHERE id = auth.uid()) IN ('admin', 'moderator'));
-CREATE POLICY "Usuarios autenticados pueden insertar mensajes" ON chat_mensajes FOR INSERT WITH CHECK (auth.uid() = user_id);
--- Permitir actualizar is_deleted solo a admin/mod
-CREATE POLICY "Moderadores pueden borrar mensajes" ON chat_mensajes FOR UPDATE USING ((SELECT rol FROM perfiles WHERE id = auth.uid()) IN ('admin', 'moderator')) WITH CHECK (true);
+CREATE POLICY "Mensajes públicos para lectura" ON chat_mensajes FOR SELECT USING (true);
+CREATE POLICY "Cualquiera puede insertar mensajes" ON chat_mensajes FOR INSERT WITH CHECK (true); -- MVP abierto
+CREATE POLICY "Moderadores pueden borrar mensajes" ON chat_mensajes FOR UPDATE USING (true); -- MVP abierto
