@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import CreatorDashboard from '../components/CreatorDashboard';
 
 export default function Admin() {
     const [titulo, setTitulo] = useState('');
@@ -43,6 +44,8 @@ export default function Admin() {
                 <h1 className="text-3xl font-bold bg-gradient-to-r from-arg-celeste to-white bg-clip-text text-transparent">Cabina de Transmisión</h1>
                 <p className="text-zinc-400 mt-2">Configuración en vivo. Los cambios se reflejan al instante en todos los clientes.</p>
             </div>
+
+            <CreatorDashboard />
 
             <div className="glass-panel border border-zinc-800/80 rounded-2xl p-6 space-y-6 bg-zinc-900/40 backdrop-blur-xl">
 

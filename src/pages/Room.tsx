@@ -19,10 +19,9 @@ export default function Room() {
             <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-arg-celeste/10 rounded-full blur-[120px] pointer-events-none" />
             <div className="absolute bottom-0 right-1/4 w-[600px] h-[600px] bg-arg-dorado/5 rounded-full blur-[150px] pointer-events-none" />
 
-            {/* Columna Izquierda: Video */}
             <div className="lg:col-span-3 flex flex-col gap-4 z-10">
                 <VideoPlayer
-                    playbackId={stream.mux_playback_id || 'vweT28M0101Q01qjD7kC9T500QIfH1fN9xN700L7Fv5bK1Yg'} // Fallback a mock si no hay ID para testear diseño
+                    playbackId={stream.is_live ? stream.mux_playback_id : ''}
                     isLive={stream.is_live}
                     title={stream.titulo}
                 />
