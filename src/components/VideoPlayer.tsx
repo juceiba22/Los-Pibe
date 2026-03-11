@@ -45,7 +45,6 @@ export default function VideoPlayer({ playbackId, isLive, title }: VideoPlayerPr
             <MuxPlayer
                 playbackId={playbackId}
                 metadataVideoTitle={title || 'Transmisión Privada'}
-                streamType="live"
                 autoPlay="muted"
                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                 accentColor="#74ACDF"
