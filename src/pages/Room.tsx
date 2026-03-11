@@ -21,7 +21,7 @@ export default function Room() {
 
             <div className="lg:col-span-3 flex flex-col gap-4 z-10">
                 <VideoPlayer
-                    playbackId={stream.is_live ? stream.mux_playback_id : ''}
+                    playbackId={stream.mux_playback_id}
                     isLive={stream.is_live}
                     title={stream.titulo}
                 />

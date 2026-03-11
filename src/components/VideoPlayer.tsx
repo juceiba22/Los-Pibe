@@ -8,7 +8,7 @@ interface VideoPlayerProps {
 }
 
 export default function VideoPlayer({ playbackId, isLive, title }: VideoPlayerProps) {
-    if (!playbackId) {
+    if (!isLive) {
         return (
             <div className="w-full aspect-video bg-zinc-900/60 backdrop-blur-md rounded-2xl border border-zinc-800/50 flex flex-col items-center justify-center relative overflow-hidden shadow-2xl">
                 <div className="absolute inset-0 bg-gradient-to-tr from-arg-celeste/5 to-transparent z-0"></div>
@@ -18,8 +18,11 @@ export default function VideoPlayer({ playbackId, isLive, title }: VideoPlayerPr
                     </svg>
                 </div>
                 <p className="text-zinc-500 font-medium z-10 flex flex-col items-center gap-2">
-                    {isLive ? 'Transmisión sin señal' : 'El creador no está transmitiendo'}
+                    Transmisión sin señal
                 </p>
+                <div className="text-xs text-zinc-600 mt-2 z-10">
+                    El creador no está transmitiendo en este momento.
+                </div>
             </div>
         );
     }
