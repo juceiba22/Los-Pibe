@@ -18,6 +18,23 @@ export default function Admin() {
             }
         };
         fetchState();
+
+        // Listen for real-time background updates (like the Mux webhook)
+        const channel = supabase.channel('admin_stream_updates')
+            .on(
+                'postgres_changes',
+                { event: 'UPDATE', schema: 'public', table: 'stream_estado', filter: 'id=eq.1' },
+                (payload: any) => {
+                    setTitulo(payload.new.titulo || '');
+                    setMuxId(payload.new.mux_playback_id || '');
+                    setIsLive(payload.new.is_live);
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
     }, []);
 
     const handleUpdate = async (newLiveStatus?: boolean) => {
@@ -45,7 +62,7 @@ export default function Admin() {
                 <p className="text-zinc-400 mt-2">Configuración en vivo. Los cambios se reflejan al instante en todos los clientes.</p>
             </div>
 
-            <CreatorDashboard />
+            <CreatorDashboard onStreamCreated={(newPlaybackId) => setMuxId(newPlaybackId)} />
 
             <div className="glass-panel border border-zinc-800/80 rounded-2xl p-6 space-y-6 bg-zinc-900/40 backdrop-blur-xl">
 

@@ -2,7 +2,11 @@ import { useState } from 'react';
 import { Video, Copy, CheckCircle2, Loader2 } from 'lucide-react';
 import { supabase } from "../lib/supabase";
 
-export default function CreatorDashboard() {
+interface CreatorDashboardProps {
+  onStreamCreated?: (playbackId: string) => void;
+}
+
+export default function CreatorDashboard({ onStreamCreated }: CreatorDashboardProps) {
   const [isCreating, setIsCreating] = useState(false);
   const [streamInfo, setStreamInfo] = useState<{
     stream_id: string;
@@ -50,6 +54,8 @@ export default function CreatorDashboard() {
 
       if (dbError) {
         console.error("Error guardando playback_id:", dbError);
+      } else if (onStreamCreated) {
+        onStreamCreated(data.playback_id);
       }
 
     } catch (err: any) {
