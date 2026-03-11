@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Video, Copy, CheckCircle2, Loader2 } from 'lucide-react';
+import { supabase } from "../lib/supabase";
 
 export default function CreatorDashboard() {
   const [isCreating, setIsCreating] = useState(false);
@@ -17,17 +18,37 @@ export default function CreatorDashboard() {
   const handleGoLive = async () => {
     setIsCreating(true);
     setError(null);
+
     try {
-      const response = await fetch("https://ulnrcxtdqvqvzjyiyprj.supabase.co/functions/v1/create-stream", {
-        method: 'POST',
-      });
-      if (!response.ok) {
-        throw new Error('No se pudo crear el stream en Mux');
+      const { data, error } = await supabase.functions.invoke("create-stream");
+
+      if (error) {
+        throw new Error(error.message);
       }
-      const data = await response.json();
+
+      if (!data) {
+        throw new Error("La función no devolvió datos");
+      }
+
+      // guardar info del stream en el estado del componente
       setStreamInfo(data);
+
+      // 🔹 guardar playback_id automáticamente en Supabase
+      const { error: dbError } = await supabase
+        .from("stream_estado")
+        .update({
+          mux_playback_id: data.playback_id,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", 1);
+
+      if (dbError) {
+        console.error("Error guardando playback_id:", dbError);
+      }
+
     } catch (err: any) {
-      setError(err.message);
+      console.error("Error creando stream:", err);
+      setError(err.message || "Error inesperado al crear el stream");
     } finally {
       setIsCreating(false);
     }
