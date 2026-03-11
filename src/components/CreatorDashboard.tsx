@@ -18,7 +18,7 @@ export default function CreatorDashboard() {
     setIsCreating(true);
     setError(null);
     try {
-      const response = await fetch('/api/create-stream', {
+      const response = await fetch("https://ulnrcxtdqvqvzjyiyprj.supabase.co/functions/v1/create-stream", {
         method: 'POST',
       });
       if (!response.ok) {
