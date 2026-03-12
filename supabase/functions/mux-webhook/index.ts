@@ -10,6 +10,9 @@ serve(async (req) => {
   try {
 
     const body = await req.json()
+  
+console.log("MUX FULL PAYLOAD:", JSON.stringify(body, null, 2))
+console.log("Mux event:", body.type)
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
