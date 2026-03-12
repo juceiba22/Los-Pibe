@@ -41,7 +41,7 @@ export default function Admin() {
         setSaving(true);
         const nextLive = newLiveStatus !== undefined ? newLiveStatus : isLive;
 
-        await supabase
+        const { error } = await supabase
             .from('stream_estado')
             .update({
                 titulo,
@@ -51,7 +51,12 @@ export default function Admin() {
             })
             .eq('id', 1);
 
-        if (newLiveStatus !== undefined) setIsLive(newLiveStatus);
+        if (error) {
+            console.error('Update error:', error);
+            alert('Hubo un error al guardar los cambios: ' + error.message);
+        } else {
+            if (newLiveStatus !== undefined) setIsLive(newLiveStatus);
+        }
         setSaving(false);
     };
 

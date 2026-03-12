@@ -1,7 +1,18 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Room from './pages/Room';
 import Admin from './pages/Admin';
+import Landing from './pages/Landing';
+import Login from './pages/Login';
+import Register from './pages/Register';
+import { useAuth } from './hooks/useAuth';
+
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+    const { user, loading } = useAuth();
+    if (loading) return null;
+    if (!user) return <Navigate to="/login" />;
+    return <>{children}</>;
+}
 
 function App() {
     return (
@@ -10,8 +21,19 @@ function App() {
                 <Navbar />
                 <main className="container mx-auto px-4 py-6">
                     <Routes>
-                        <Route path="/" element={<Room />} />
-                        <Route path="/admin" element={<Admin />} />
+                        <Route path="/" element={<Landing />} />
+                        <Route path="/login" element={<Login />} />
+                        <Route path="/register" element={<Register />} />
+                        <Route path="/room" element={
+                            <ProtectedRoute>
+                                <Room />
+                            </ProtectedRoute>
+                        } />
+                        <Route path="/admin" element={
+                            <ProtectedRoute>
+                                <Admin />
+                            </ProtectedRoute>
+                        } />
                     </Routes>
                 </main>
             </div>

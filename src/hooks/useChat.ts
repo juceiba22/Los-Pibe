@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { useAuth } from './useAuth';
 
 export interface Message {
     id: string;
@@ -13,20 +14,14 @@ export interface Message {
 export function useChat() {
     const [messages, setMessages] = useState<Message[]>([]);
     const [isConnected, setIsConnected] = useState(false);
+    const { user, profile } = useAuth();
 
     useEffect(() => {
         // 1. Cargar mensajes iniciales
         const fetchMessages = async () => {
             const { data, error } = await supabase
                 .from('chat_mensajes')
-                .select(`
-          id,
-          user_id,
-          username,
-          mensaje,
-          is_deleted,
-          created_at
-        `)
+                .select('id, user_id, mensaje, is_deleted, created_at, perfiles(username)')
                 .order('created_at', { ascending: true })
                 .limit(100);
 
@@ -34,13 +29,14 @@ export function useChat() {
                 const formatted = data.map((d: any) => ({
                     id: d.id,
                     user_id: d.user_id,
-                    username: d.username,
+                    username: d.perfiles?.username || 'Usuario',
                     mensaje: d.mensaje,
                     is_deleted: d.is_deleted,
                     time: new Date(d.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
                 }));
                 setMessages(formatted);
             }
+            if (error) console.error("Error fetching messages:", error);
             setIsConnected(true);
         };
 
@@ -57,16 +53,22 @@ export function useChat() {
                         if (prev.some(m => m.id === payload.new.id || (m.mensaje === payload.new.mensaje && m.user_id === payload.new.user_id))) {
                             return prev;
                         }
-                        const newMsg: Message = {
+                        return [...prev, {
                             id: payload.new.id,
                             user_id: payload.new.user_id,
-                            username: payload.new.username,
+                            username: 'Alguien', // Fallback until we reload or fetch profile info if needed, or we just rely on fetch
                             mensaje: payload.new.mensaje,
                             is_deleted: payload.new.is_deleted,
                             time: new Date(payload.new.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
-                        };
-                        return [...prev, newMsg];
+                        }];
                     });
+                    
+                    // Se podría hacer un fetch específico del perfil si 'Alguien' es molestoso. 
+                    // Para mantenerlo simple, recargamos el username del user si lo encontramos:
+                    const { data: profileData } = await supabase.from('perfiles').select('username').eq('id', payload.new.user_id).single();
+                    if (profileData) {
+                        setMessages(current => current.map(m => m.id === payload.new.id ? { ...m, username: profileData.username } : m));
+                    }
                 }
             )
             .on(
@@ -85,35 +87,33 @@ export function useChat() {
         };
     }, []);
 
-    const sendMessage = async (mensaje: string, userId: string = 'me') => {
-        let localUserId = localStorage.getItem('local_user_id') || '';
-        let localUserName = localStorage.getItem('local_username') || '';
+    const sendMessage = async (mensaje: string) => {
+        if (!user || !profile) return;
 
-        if (!localUserId) {
-            localUserId = 'user_' + Math.random().toString(36).substring(7);
-            localUserName = 'Pibe_' + Math.floor(Math.random() * 1000);
-            localStorage.setItem('local_user_id', localUserId);
-            localStorage.setItem('local_username', localUserName);
-        }
-
-        // Temporary optimistic UI for local user
         const tempId = Math.random().toString(36).substring(7);
         const newMsg: Message = {
             id: tempId,
-            user_id: localUserId,
-            username: localUserName, // Shown as own name instantly
+            user_id: user.id,
+            username: profile.username || user.email || 'Vos',
             mensaje,
             is_deleted: false,
             time: new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
         };
+        
+        // Optimistic UI for local user
         setMessages(prev => [...prev, newMsg]);
 
         // Guardar en Supabase para que llegue a las otras ventanas
-        await supabase.from('chat_mensajes').insert([{
-            user_id: localUserId,
-            username: localUserName,
+        const { error } = await supabase.from('chat_mensajes').insert([{
+            user_id: user.id,
             mensaje
         }]);
+
+        if (error) {
+            console.error("Error sending message:", error);
+            // Revert optimistic UI if failed
+            setMessages(prev => prev.filter(m => m.id !== tempId));
+        }
     };
 
     const deleteMessage = async (id: string) => {

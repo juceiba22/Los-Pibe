@@ -1,13 +1,16 @@
-import { Link } from 'react-router-dom';
 import VideoPlayer from '../components/VideoPlayer';
-import ViewerCount from '../components/ViewerCount';
 import Chat from '../components/Chat';
 import { useChat } from '../hooks/useChat';
 import { useStreamState } from '../hooks/useStreamState';
+import { useAuth } from '../hooks/useAuth';
 
 export default function Room() {
     const { messages, sendMessage, deleteMessage } = useChat();
     const stream = useStreamState();
+    const { profile } = useAuth();
+    
+    // Check if the current user has moderation capabilities
+    const isAdminOrMod = profile?.rol === 'admin' || profile?.rol === 'moderator';
 
     const handleSendMessage = (text: string) => {
         sendMessage(text);
@@ -32,7 +35,7 @@ export default function Room() {
                 <Chat
                     messages={messages}
                     onSendMessage={handleSendMessage}
-                    isAdminOrMod={true} // Por ahora hardcodeado, luego depende de Auth
+                    isAdminOrMod={isAdminOrMod}
                     onDeleteMessage={deleteMessage}
                 />
             </div>
