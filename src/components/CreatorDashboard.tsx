@@ -28,7 +28,18 @@ export default function CreatorDashboard({ onStreamCreated }: CreatorDashboardPr
 
       if (error) {
         console.error("Edge Function error:", error);
-        throw new Error(error.message || "Error en la Edge Function");
+        
+        let errorMessage = error.message || "Error en la Edge Function";
+        if (error.context) {
+          try {
+            const contextText = await error.context.text();
+            errorMessage += ` - ${contextText}`;
+          } catch (e) {
+            // ignore
+          }
+        }
+        
+        throw new Error(errorMessage);
       }
 
       if (!data || !data.stream_key || !data.playback_id) {
