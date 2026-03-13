@@ -10,7 +10,7 @@ export default function Room() {
     const { profile } = useAuth();
     
     // Check if the current user has moderation capabilities
-    const isAdminOrMod = profile?.rol === 'admin' || profile?.rol === 'moderator';
+    const isAdminOrMod = profile?.rol === 'conductor';
 
     const handleSendMessage = (text: string) => {
         sendMessage(text);

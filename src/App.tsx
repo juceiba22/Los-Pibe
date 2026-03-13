@@ -6,6 +6,7 @@ import Landing from './pages/Landing';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import { useAuth } from './hooks/useAuth';
+import RequireRole from './components/RequireRole';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
     const { user, loading } = useAuth();
@@ -30,9 +31,14 @@ function App() {
                             </ProtectedRoute>
                         } />
                         <Route path="/admin" element={
-                            <ProtectedRoute>
+                            <RequireRole role="conductor">
                                 <Admin />
-                            </ProtectedRoute>
+                            </RequireRole>
+                        } />
+                        <Route path="/dashboard" element={
+                            <RequireRole role="conductor">
+                                <Admin />
+                            </RequireRole>
                         } />
                     </Routes>
                 </main>

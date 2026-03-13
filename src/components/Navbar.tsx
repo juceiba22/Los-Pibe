@@ -27,11 +27,13 @@ export default function Navbar() {
                             <Link to="/room" className="px-3 py-1 bg-zinc-800/80 hover:bg-zinc-700/80 transition-colors rounded-full text-xs font-medium text-zinc-300 border border-zinc-700/50 backdrop-blur-sm shadow-sm hidden sm:block">
                                 Transmisión
                             </Link>
-                            <Link to="/admin" className="px-3 py-1 bg-zinc-800/80 hover:bg-zinc-700/80 transition-colors rounded-full text-xs font-medium text-zinc-300 border border-zinc-700/50 backdrop-blur-sm shadow-sm flex items-center gap-2 group">
-                                <Radio size={14} className="text-red-500 animate-pulse" />
-                                <span className="group-hover:text-white transition-colors hidden sm:inline-block">Cabina</span>
-                                <ShieldAlert className="w-3.5 h-3.5 ml-1 text-zinc-500 group-hover:text-arg-celeste transition-colors" />
-                            </Link>
+                            {profile?.rol === 'conductor' && (
+                                <Link to="/admin" className="px-3 py-1 bg-zinc-800/80 hover:bg-zinc-700/80 transition-colors rounded-full text-xs font-medium text-zinc-300 border border-zinc-700/50 backdrop-blur-sm shadow-sm flex items-center gap-2 group">
+                                    <Radio size={14} className="text-red-500 animate-pulse" />
+                                    <span className="group-hover:text-white transition-colors hidden sm:inline-block">Cabina</span>
+                                    <ShieldAlert className="w-3.5 h-3.5 ml-1 text-zinc-500 group-hover:text-arg-celeste transition-colors" />
+                                </Link>
+                            )}
                             <button onClick={handleLogout} title="Cerrar sesión" className="p-2 bg-zinc-800/80 hover:bg-zinc-700/80 transition-colors rounded-full text-zinc-300 border border-zinc-700/50 flex items-center justify-center">
                                 <LogOut size={16} />
                             </button>
