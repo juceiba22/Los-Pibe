@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './useAuth';
+import { useStreamState } from './useStreamState';
 
 export interface Message {
     id: string;
@@ -17,13 +18,16 @@ export function useChat() {
     const [messages, setMessages] = useState<Message[]>([]);
     const [isConnected, setIsConnected] = useState(false);
     const { user, profile } = useAuth();
+    const stream = useStreamState();
+const currentStreamId = stream?.id;
 
     useEffect(() => {
         // 1. Cargar mensajes iniciales
         const fetchMessages = async () => {
             const { data, error } = await supabase
                 .from('chat_mensajes')
-                .select('id, user_id, mensaje, is_deleted, created_at, type, content, perfiles(username)')
+                .select('id, user_id, mensaje, is_deleted, stream_id, created_at, type, content, perfiles(username)')
+                .eq('stream_id', currentStreamId)
                 .order('created_at', { ascending: true })
                 .limit(100);
 
@@ -50,7 +54,7 @@ export function useChat() {
         const channel = supabase.channel('chat_room')
             .on(
                 'postgres_changes',
-                { event: 'INSERT', schema: 'public', table: 'chat_mensajes' },
+                { event: 'INSERT', schema: 'public', table: 'chat_mensajes',filter: `stream_id=eq.${currentStreamId}` },
                 async (payload: any) => {
                     // Check if we already added it via optimistic UI
                     setMessages(prev => {
@@ -114,7 +118,8 @@ export function useChat() {
         const { error } = await supabase.from('chat_mensajes').insert([{
             user_id: user.id,
             mensaje,
-            type: 'text'
+            type: 'text',
+            stream_id: currentStreamId
         }]);
 
         if (error) {
@@ -146,7 +151,8 @@ export function useChat() {
         const { error } = await supabase.from('chat_mensajes').insert([{
             user_id: user.id,
             type: 'sticker',
-            content: stickerId
+            content: stickerId,
+            stream_id: currentStreamId
         }]);
 
         if (error) {
