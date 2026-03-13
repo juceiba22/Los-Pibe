@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import CreatorDashboard from '../components/CreatorDashboard';
 import { useAuth } from '../hooks/useAuth';
-import { Copy, Check, TicketPlus } from 'lucide-react';
+import { Copy, TicketPlus } from 'lucide-react';
 
 export default function Admin() {
     const [titulo, setTitulo] = useState('');
@@ -12,9 +12,14 @@ export default function Admin() {
     
     // Invitations
     const { user } = useAuth();
-    const [invitationLink, setInvitationLink] = useState('');
+    interface Invitation {
+        id: string;
+        codigo: string;
+        usado: boolean;
+        creado_en: string;
+    }
+    const [invitations, setInvitations] = useState<Invitation[]>([]);
     const [generatingInvite, setGeneratingInvite] = useState(false);
-    const [copied, setCopied] = useState(false);
 
     useEffect(() => {
         const fetchState = async () => {
@@ -26,6 +31,19 @@ export default function Admin() {
             }
         };
         fetchState();
+
+        const fetchInvitations = async () => {
+            if (!user) return;
+            const { data } = await supabase
+                .from('invitaciones')
+                .select('id, codigo, usado, creado_en')
+                .eq('creado_por', user.id)
+                .order('creado_en', { ascending: false });
+            if (data) {
+                setInvitations(data);
+            }
+        };
+        fetchInvitations();
 
         // Listen for real-time background updates (like the Mux webhook)
         const channel = supabase.channel('admin_stream_updates')
@@ -71,28 +89,28 @@ export default function Admin() {
     const handleGenerateInvite = async () => {
         if (!user) return;
         setGeneratingInvite(true);
-        setCopied(false);
         const code = Math.random().toString(36).substring(2, 10).toUpperCase();
         
-        const { error } = await supabase
+        const { data, error } = await supabase
             .from('invitaciones')
             .insert([{
                 codigo: code,
                 creado_por: user.id
-            }]);
+            }])
+            .select()
+            .single();
             
         setGeneratingInvite(false);
         if (error) {
             alert('Error generando invitación: ' + error.message);
-        } else {
-            setInvitationLink(`${window.location.origin}/invite/${code}`);
+        } else if (data) {
+            setInvitations(prev => [data, ...prev]);
         }
     };
 
-    const copyToClipboard = () => {
-        navigator.clipboard.writeText(invitationLink);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+    const copyToClipboard = (codigo: string) => {
+        navigator.clipboard.writeText(`${window.location.origin}/invite/${codigo}`);
+        // Consider a toast notification here if you add one later
     };
 
     return (
@@ -120,24 +138,36 @@ export default function Admin() {
                     >
                         {generatingInvite ? 'Generando...' : 'Crear Link'}
                     </button>
-                    {invitationLink && (
-                        <div className="flex-1 flex items-center bg-zinc-950/50 border border-zinc-800/80 rounded-xl overflow-hidden">
-                            <input 
-                                type="text" 
-                                readOnly 
-                                value={invitationLink}
-                                className="w-full bg-transparent px-4 py-2 text-sm text-zinc-300 focus:outline-none"
-                            />
-                            <button 
-                                onClick={copyToClipboard}
-                                className="p-3 hover:bg-zinc-800/60 transition-colors text-zinc-400 hover:text-white"
-                                title="Copiar link"
-                            >
-                                {copied ? <Check size={18} className="text-green-500" /> : <Copy size={18} />}
-                            </button>
-                        </div>
-                    )}
+                    {/* The new invitation list will be shown below if there are any */}
                 </div>
+                
+                {invitations.length > 0 && (
+                    <div className="mt-6 space-y-2">
+                        <h3 className="text-sm font-medium text-zinc-300">Tus Invitaciones Generadas</h3>
+                        <div className="max-h-60 overflow-y-auto pr-2 custom-scrollbar space-y-2">
+                            {invitations.map(inv => (
+                                <div key={inv.id} className="flex items-center justify-between p-3 bg-zinc-950/50 border border-zinc-800/80 rounded-xl">
+                                    <div>
+                                        <p className="font-mono text-white text-sm">{inv.codigo}</p>
+                                        <div className="flex items-center gap-2 mt-1">
+                                            <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${inv.usado ? 'bg-zinc-800 text-zinc-500' : 'bg-green-500/20 text-green-400'}`}>
+                                                {inv.usado ? 'Usada' : 'Disponible'}
+                                            </span>
+                                            <span className="text-xs text-zinc-500">{new Date(inv.creado_en).toLocaleDateString()}</span>
+                                        </div>
+                                    </div>
+                                    <button 
+                                        onClick={() => copyToClipboard(inv.codigo)}
+                                        className="p-2 hover:bg-zinc-800/60 transition-colors text-zinc-400 hover:text-white rounded-lg flex-shrink-0"
+                                        title="Copiar link"
+                                    >
+                                        <Copy size={16} />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
             </div>
 
             <CreatorDashboard onStreamCreated={(newPlaybackId) => setMuxId(newPlaybackId)} />
