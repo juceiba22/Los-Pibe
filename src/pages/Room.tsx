@@ -1,4 +1,5 @@
 import VideoPlayer from '../components/VideoPlayer';
+import TribunaReacciones from '../components/TribunaReacciones';
 import Chat from '../components/Chat';
 import { useChat } from '../hooks/useChat';
 import { useStreamState } from '../hooks/useStreamState';
@@ -28,6 +29,7 @@ export default function Room() {
                     isLive={stream.is_live}
                     title={stream.titulo}
                 />
+                <TribunaReacciones />
             </div>
 
             {/* Columna Derecha: Chat */}
