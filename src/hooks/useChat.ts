@@ -19,7 +19,7 @@ export function useChat() {
     const [isConnected, setIsConnected] = useState(false);
     const { user, profile } = useAuth();
     const stream = useStreamState();
-const currentStreamId = stream?.id;
+    const currentStreamId = stream?.mux_playback_id;
 
     useEffect(() => {
         // 1. Cargar mensajes iniciales
