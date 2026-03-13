@@ -54,9 +54,10 @@ export function useChat() {
         const channel = supabase.channel('chat_room')
             .on(
                 'postgres_changes',
-                { event: 'INSERT', schema: 'public', table: 'chat_mensajes',filter: `stream_id=eq.${currentStreamId}` },
+                { event: 'INSERT', schema: 'public', table: 'chat_mensajes'},
                 async (payload: any) => {
                     // Check if we already added it via optimistic UI
+                    if (payload.new.stream_id !== currentStreamId) return;
                     setMessages(prev => {
                         if (prev.some(m => m.id === payload.new.id || (m.mensaje === payload.new.mensaje && m.user_id === payload.new.user_id && m.type === payload.new.type && m.content === payload.new.content))) {
                             return prev;
