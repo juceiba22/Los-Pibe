@@ -1,5 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Smile, X, Trash2 } from 'lucide-react';
+import { Send, Smile, X, Sticker } from 'lucide-react';
+import ChatMessage from './ChatMessage';
+import StickerPicker from './StickerPicker';
+import { Message } from '../hooks/useChat';
 
 const EMOJI_OPTIONS = [
     { id: 'mate', icon: '🧉', tooltip: 'Mate' },
@@ -11,34 +14,46 @@ const EMOJI_OPTIONS = [
     { id: 'sanmartin', icon: 'sanmartin.png', tooltip: 'San Martín' },
 ];
 
-interface Message {
-    id: string;
-    user_id: string;
-    username: string;
-    mensaje: string;
-    is_deleted: boolean;
-    time?: string;
-}
-
 interface ChatProps {
     messages: Message[];
     onSendMessage: (text: string) => void;
+    onSendSticker?: (stickerId: string) => void;
     onDeleteMessage?: (id: string) => void;
     isAdminOrMod?: boolean;
 }
 
-export default function Chat({ messages, onSendMessage, onDeleteMessage, isAdminOrMod = false }: ChatProps) {
+export default function Chat({ messages, onSendMessage, onSendSticker, onDeleteMessage, isAdminOrMod = false }: ChatProps) {
     const [inputText, setInputText] = useState('');
     const [showEmojis, setShowEmojis] = useState(false);
-    const chatEndRef = useRef<HTMLDivElement>(null);
+    const [showStickers, setShowStickers] = useState(false);
+    const chatContainerRef = useRef<HTMLDivElement>(null);
+    const shouldAutoScroll = useRef(true);
 
-    const scrollToBottom = () => {
-        chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    };
 
     useEffect(() => {
-        scrollToBottom();
+        const el = chatContainerRef.current;
+        if (!el) return;
+
+        if (shouldAutoScroll.current) {
+            el.scrollTop = el.scrollHeight;
+        }
     }, [messages]);
+    useEffect(() => {
+        const el = chatContainerRef.current;
+        if (!el) return;
+
+        const handleScroll = () => {
+            const distanceFromBottom =
+                el.scrollHeight - el.scrollTop - el.clientHeight;
+
+            shouldAutoScroll.current = distanceFromBottom < 120;
+        };
+
+        el.addEventListener("scroll", handleScroll);
+
+        return () => el.removeEventListener("scroll", handleScroll);
+    }, []);
+
 
     const handleSubmit = (e?: React.FormEvent) => {
         e?.preventDefault();
@@ -68,53 +83,29 @@ export default function Chat({ messages, onSendMessage, onDeleteMessage, isAdmin
             </div>
 
             {/* Messages Layout */}
-            <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4 relative z-10 custom-scrollbar" style={{ backgroundImage: 'radial-gradient(circle at center, rgba(116, 172, 223, 0.03) 0%, transparent 100%)' }}>
+            <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 flex flex-col gap-4 relative z-10 custom-scrollbar" style={{ backgroundImage: 'radial-gradient(circle at center, rgba(116, 172, 223, 0.03) 0%, transparent 100%)' }}>
                 {messages.length === 0 ? (
                     <div className="text-zinc-500 text-sm italic text-center mt-10">
                         Sé el primero en saludar...
                     </div>
                 ) : (
                     messages.map((msg) => {
-                        const isMe = msg.username === 'Vos' || msg.user_id === 'me'; // Assuming 'Vos' or 'me' ID for own messages in UI mock
+                        const isMe = msg.username === 'Vos' || msg.user_id === 'me';
                         return (
-                            <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} group animate-in slide-in-from-bottom-2 duration-300`}>
-                                <div className="flex items-baseline gap-2 mb-1 px-1">
-                                    <span className={`font-medium text-sm ${isMe ? 'text-arg-dorado' : 'text-arg-celeste group-hover:text-white transition-colors'}`}>
-                                        {msg.username}
-                                    </span>
-                                    <span className="text-[10px] text-zinc-500">{msg.time || new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}</span>
-                                </div>
-                                <div className="flex items-center gap-2 max-w-[90%]">
-                                    <div className={`px-4 py-2 rounded-2xl text-sm shadow-sm backdrop-blur-sm ${isMe
-                                        ? 'bg-arg-celeste/20 text-white border border-arg-celeste/30 rounded-tr-sm'
-                                        : 'bg-zinc-800/60 text-zinc-100 border border-zinc-700/50 rounded-tl-sm hover:border-zinc-600 transition-colors'
-                                        }`}>
-                                        {msg.is_deleted ? (
-                                            <span className="text-zinc-500 italic">Mensaje eliminado por moderación</span>
-                                        ) : (
-                                            msg.mensaje
-                                        )}
-                                    </div>
-
-                                    {!msg.is_deleted && isAdminOrMod && onDeleteMessage && (
-                                        <button
-                                            onClick={() => onDeleteMessage(msg.id)}
-                                            className="opacity-0 group-hover:opacity-100 text-red-500/80 hover:text-red-400 transition-opacity p-1.5 rounded-full hover:bg-red-500/10"
-                                            title="Borrar mensaje"
-                                        >
-                                            <Trash2 size={14} />
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
+                            <ChatMessage
+                                key={msg.id}
+                                message={msg}
+                                isMe={isMe}
+                                isAdminOrMod={isAdminOrMod}
+                                onDelete={onDeleteMessage}
+                            />
                         );
                     })
                 )}
-                <div ref={chatEndRef} />
             </div>
 
             {/* Custom Argentine Emoji Picker Layer */}
-            {showEmojis && (
+            {showEmojis && !showStickers && (
                 <div className="absolute bottom-[80px] left-4 right-4 bg-zinc-900/95 backdrop-blur-xl border border-zinc-700/50 rounded-xl p-3 shadow-2xl z-30 animate-in fade-in zoom-in-95 duration-200">
                     <div className="flex justify-between items-center mb-2 px-1">
                         <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Iconos Nacionales</span>
@@ -150,23 +141,44 @@ export default function Chat({ messages, onSendMessage, onDeleteMessage, isAdmin
                 </div>
             )}
 
+            {/* Sticker Picker */}
+            {showStickers && (
+                <StickerPicker
+                    onSelectSticker={(id) => {
+                        onSendSticker?.(id);
+                        setShowStickers(false);
+                    }}
+                    onClose={() => setShowStickers(false)}
+                />
+            )}
+
             {/* Input Area */}
             <div className="p-4 bg-zinc-900/80 backdrop-blur-xl border-t border-zinc-800/60 relative z-20">
                 <form onSubmit={handleSubmit} className="relative flex items-center group">
-                    <button
-                        type="button"
-                        onClick={() => setShowEmojis(!showEmojis)}
-                        className="absolute left-3 text-zinc-400 hover:text-arg-dorado transition-colors z-10"
-                        title="Emojis"
-                    >
-                        <Smile size={20} />
-                    </button>
+                    <div className="absolute left-3 flex items-center gap-2 z-10">
+                        <button
+                            type="button"
+                            onClick={() => { setShowEmojis(!showEmojis); setShowStickers(false); }}
+                            className={`${showEmojis ? 'text-arg-dorado' : 'text-zinc-400'} hover:text-arg-dorado transition-colors`}
+                            title="Emojis"
+                        >
+                            <Smile size={18} />
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => { setShowStickers(!showStickers); setShowEmojis(false); }}
+                            className={`${showStickers ? 'text-arg-dorado' : 'text-zinc-400'} hover:text-arg-dorado transition-colors`}
+                            title="Stickers"
+                        >
+                            <Sticker size={18} />
+                        </button>
+                    </div>
                     <input
                         type="text"
                         value={inputText}
                         onChange={(e) => setInputText(e.target.value)}
                         placeholder="Escribí un mensaje..."
-                        className="w-full bg-zinc-950/50 text-white text-sm rounded-full py-3.5 pl-11 pr-14 outline-none focus:ring-2 focus:ring-arg-celeste/50 border border-zinc-800/80 transition-all placeholder:text-zinc-500 focus:bg-zinc-900"
+                        className="w-full bg-zinc-950/50 text-white text-sm rounded-full py-3.5 pl-16 pr-14 outline-none focus:ring-2 focus:ring-arg-celeste/50 border border-zinc-800/80 transition-all placeholder:text-zinc-500 focus:bg-zinc-900"
                     />
                     <button
                         type="submit"

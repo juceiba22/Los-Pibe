@@ -9,6 +9,8 @@ export interface Message {
     mensaje: string;
     is_deleted: boolean;
     time?: string;
+    type?: string;
+    content?: string;
 }
 
 export function useChat() {
@@ -21,7 +23,7 @@ export function useChat() {
         const fetchMessages = async () => {
             const { data, error } = await supabase
                 .from('chat_mensajes')
-                .select('id, user_id, mensaje, is_deleted, created_at, perfiles(username)')
+                .select('id, user_id, mensaje, is_deleted, created_at, type, content, perfiles(username)')
                 .order('created_at', { ascending: true })
                 .limit(100);
 
@@ -31,6 +33,8 @@ export function useChat() {
                     user_id: d.user_id,
                     username: d.perfiles?.username || 'Usuario',
                     mensaje: d.mensaje,
+                    type: d.type || 'text',
+                    content: d.content,
                     is_deleted: d.is_deleted,
                     time: new Date(d.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
                 }));
@@ -50,7 +54,7 @@ export function useChat() {
                 async (payload: any) => {
                     // Check if we already added it via optimistic UI
                     setMessages(prev => {
-                        if (prev.some(m => m.id === payload.new.id || (m.mensaje === payload.new.mensaje && m.user_id === payload.new.user_id))) {
+                        if (prev.some(m => m.id === payload.new.id || (m.mensaje === payload.new.mensaje && m.user_id === payload.new.user_id && m.type === payload.new.type && m.content === payload.new.content))) {
                             return prev;
                         }
                         return [...prev, {
@@ -58,6 +62,8 @@ export function useChat() {
                             user_id: payload.new.user_id,
                             username: 'Alguien', // Fallback until we reload or fetch profile info if needed, or we just rely on fetch
                             mensaje: payload.new.mensaje,
+                            type: payload.new.type || 'text',
+                            content: payload.new.content,
                             is_deleted: payload.new.is_deleted,
                             time: new Date(payload.new.created_at).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
                         }];
@@ -96,6 +102,7 @@ export function useChat() {
             user_id: user.id,
             username: profile.username || user.email || 'Vos',
             mensaje,
+            type: 'text',
             is_deleted: false,
             time: new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
         };
@@ -106,11 +113,44 @@ export function useChat() {
         // Guardar en Supabase para que llegue a las otras ventanas
         const { error } = await supabase.from('chat_mensajes').insert([{
             user_id: user.id,
-            mensaje
+            mensaje,
+            type: 'text'
         }]);
 
         if (error) {
             console.error("Error sending message:", error);
+            // Revert optimistic UI if failed
+            setMessages(prev => prev.filter(m => m.id !== tempId));
+        }
+    };
+
+    const sendSticker = async (stickerId: string) => {
+        if (!user || !profile) return;
+
+        const tempId = Math.random().toString(36).substring(7);
+        const newMsg: Message = {
+            id: tempId,
+            user_id: user.id,
+            username: profile.username || user.email || 'Vos',
+            mensaje: '',
+            type: 'sticker',
+            content: stickerId,
+            is_deleted: false,
+            time: new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
+        };
+        
+        // Optimistic UI for local user
+        setMessages(prev => [...prev, newMsg]);
+
+        // Guardar en Supabase para que llegue a las otras ventanas
+        const { error } = await supabase.from('chat_mensajes').insert([{
+            user_id: user.id,
+            type: 'sticker',
+            content: stickerId
+        }]);
+
+        if (error) {
+            console.error("Error sending sticker:", error);
             // Revert optimistic UI if failed
             setMessages(prev => prev.filter(m => m.id !== tempId));
         }
@@ -122,5 +162,5 @@ export function useChat() {
         await supabase.from('chat_mensajes').update({ is_deleted: true }).eq('id', id);
     };
 
-    return { messages, sendMessage, deleteMessage, isConnected };
+    return { messages, sendMessage, sendSticker, deleteMessage, isConnected };
 }

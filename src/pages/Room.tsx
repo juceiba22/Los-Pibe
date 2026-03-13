@@ -5,7 +5,7 @@ import { useStreamState } from '../hooks/useStreamState';
 import { useAuth } from '../hooks/useAuth';
 
 export default function Room() {
-    const { messages, sendMessage, deleteMessage } = useChat();
+    const { messages, sendMessage, sendSticker, deleteMessage } = useChat();
     const stream = useStreamState();
     const { profile } = useAuth();
     
@@ -35,6 +35,7 @@ export default function Room() {
                 <Chat
                     messages={messages}
                     onSendMessage={handleSendMessage}
+                    onSendSticker={sendSticker}
                     isAdminOrMod={isAdminOrMod}
                     onDeleteMessage={deleteMessage}
                 />
