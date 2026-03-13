@@ -29,14 +29,8 @@ export default function Landing() {
                 ) : (
                     <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
                         <Link
-                            to="/register"
-                            className="w-full sm:w-auto px-8 py-3.5 rounded-full bg-arg-celeste hover:bg-arg-celeste/90 text-zinc-950 font-bold transition-all hover:-translate-y-0.5 active:scale-95 shadow-lg shadow-arg-celeste/20"
-                        >
-                            Sumate a la banda
-                        </Link>
-                        <Link
                             to="/login"
-                            className="w-full sm:w-auto px-8 py-3.5 rounded-full bg-zinc-800 hover:bg-zinc-700 text-white font-semibold transition-all hover:-translate-y-0.5 active:scale-95 border border-zinc-700"
+                            className="w-full sm:w-auto px-8 py-3.5 rounded-full bg-arg-celeste hover:bg-arg-celeste/90 text-zinc-950 font-bold transition-all hover:-translate-y-0.5 active:scale-95 shadow-lg shadow-arg-celeste/20"
                         >
                             Iniciar Sesión
                         </Link>

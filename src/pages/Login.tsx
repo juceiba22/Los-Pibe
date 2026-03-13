@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Loader2 } from 'lucide-react';
 
@@ -75,9 +75,9 @@ export default function Login() {
 
                 <p className="text-center text-zinc-400 mt-6 text-sm">
                     ¿No tenés cuenta?{' '}
-                    <Link to="/register" className="text-arg-celeste hover:text-white transition-colors font-medium">
-                        Registrate acá
-                    </Link>
+                    <span className="text-arg-celeste font-medium">
+                        Pedile una invitación a un conductor
+                    </span>
                 </p>
             </div>
         </div>

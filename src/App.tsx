@@ -4,7 +4,7 @@ import Room from './pages/Room';
 import Admin from './pages/Admin';
 import Landing from './pages/Landing';
 import Login from './pages/Login';
-import Register from './pages/Register';
+import Invite from './pages/Invite';
 import { useAuth } from './hooks/useAuth';
 import RequireRole from './components/RequireRole';
 
@@ -24,7 +24,8 @@ function App() {
                     <Routes>
                         <Route path="/" element={<Landing />} />
                         <Route path="/login" element={<Login />} />
-                        <Route path="/register" element={<Register />} />
+                        <Route path="/register" element={<Navigate to="/login" replace />} />
+                        <Route path="/invite/:codigo" element={<Invite />} />
                         <Route path="/room" element={
                             <ProtectedRoute>
                                 <Room />

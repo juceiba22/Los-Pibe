@@ -1,12 +1,20 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import CreatorDashboard from '../components/CreatorDashboard';
+import { useAuth } from '../hooks/useAuth';
+import { Copy, Check, TicketPlus } from 'lucide-react';
 
 export default function Admin() {
     const [titulo, setTitulo] = useState('');
     const [muxId, setMuxId] = useState('');
     const [isLive, setIsLive] = useState(false);
     const [saving, setSaving] = useState(false);
+    
+    // Invitations
+    const { user } = useAuth();
+    const [invitationLink, setInvitationLink] = useState('');
+    const [generatingInvite, setGeneratingInvite] = useState(false);
+    const [copied, setCopied] = useState(false);
 
     useEffect(() => {
         const fetchState = async () => {
@@ -60,11 +68,76 @@ export default function Admin() {
         setSaving(false);
     };
 
+    const handleGenerateInvite = async () => {
+        if (!user) return;
+        setGeneratingInvite(true);
+        setCopied(false);
+        const code = Math.random().toString(36).substring(2, 10).toUpperCase();
+        
+        const { error } = await supabase
+            .from('invitaciones')
+            .insert([{
+                codigo: code,
+                creado_por: user.id
+            }]);
+            
+        setGeneratingInvite(false);
+        if (error) {
+            alert('Error generando invitación: ' + error.message);
+        } else {
+            setInvitationLink(`${window.location.origin}/invite/${code}`);
+        }
+    };
+
+    const copyToClipboard = () => {
+        navigator.clipboard.writeText(invitationLink);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+
     return (
         <div className="max-w-2xl mx-auto space-y-8">
             <div>
                 <h1 className="text-3xl font-bold bg-gradient-to-r from-arg-celeste to-white bg-clip-text text-transparent">Cabina de Transmisión</h1>
                 <p className="text-zinc-400 mt-2">Configuración en vivo. Los cambios se reflejan al instante en todos los clientes.</p>
+            </div>
+
+            <div className="glass-panel border border-zinc-800/80 rounded-2xl p-6 bg-zinc-900/40 backdrop-blur-xl">
+                <div className="flex items-center gap-3 mb-4">
+                    <div className="p-2 bg-indigo-500/10 rounded-lg">
+                        <TicketPlus className="w-5 h-5 text-indigo-400" />
+                    </div>
+                    <div>
+                        <h2 className="text-lg font-bold text-white">Generar Invitación</h2>
+                        <p className="text-xs text-zinc-400">Creá un link de un solo uso para invitar a alguien.</p>
+                    </div>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-4">
+                    <button
+                        onClick={handleGenerateInvite}
+                        disabled={generatingInvite}
+                        className="px-6 py-2.5 rounded-xl bg-indigo-500 hover:bg-indigo-600 text-white font-bold transition-all shadow-lg hover:shadow-indigo-500/20 active:scale-95 disabled:opacity-50 whitespace-nowrap"
+                    >
+                        {generatingInvite ? 'Generando...' : 'Crear Link'}
+                    </button>
+                    {invitationLink && (
+                        <div className="flex-1 flex items-center bg-zinc-950/50 border border-zinc-800/80 rounded-xl overflow-hidden">
+                            <input 
+                                type="text" 
+                                readOnly 
+                                value={invitationLink}
+                                className="w-full bg-transparent px-4 py-2 text-sm text-zinc-300 focus:outline-none"
+                            />
+                            <button 
+                                onClick={copyToClipboard}
+                                className="p-3 hover:bg-zinc-800/60 transition-colors text-zinc-400 hover:text-white"
+                                title="Copiar link"
+                            >
+                                {copied ? <Check size={18} className="text-green-500" /> : <Copy size={18} />}
+                            </button>
+                        </div>
+                    )}
+                </div>
             </div>
 
             <CreatorDashboard onStreamCreated={(newPlaybackId) => setMuxId(newPlaybackId)} />
