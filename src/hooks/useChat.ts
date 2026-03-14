@@ -96,7 +96,7 @@ export function useChat() {
         return () => {
             supabase.removeChannel(channel);
         };
-    }, []);
+    }, [currentStreamId]);
 
     const sendMessage = async (mensaje: string) => {
         if (!user || !profile) return;
