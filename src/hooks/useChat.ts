@@ -113,7 +113,7 @@ export function useChat() {
         };
         
         // Optimistic UI for local user
-        setMessages(prev => [...prev, newMsg]);
+
 
         // Guardar en Supabase para que llegue a las otras ventanas
         const { error } = await supabase.from('chat_mensajes').insert([{
