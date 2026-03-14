@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import VideoPlayer from '../components/VideoPlayer';
 import TribunaReacciones from '../components/TribunaReacciones';
 import Chat from '../components/Chat';
@@ -10,6 +11,14 @@ export default function Room() {
     const stream = useStreamState();
     const { profile } = useAuth();
 
+    const [viewers, setViewers] = useState(0);
+
+    // Simulación de viewers (solo para prueba)
+    useEffect(() => {
+        const fakeViewers = Math.floor(Math.random() * 60);
+        setViewers(fakeViewers);
+    }, []);
+
     // Check if the current user has moderation capabilities
     const isAdminOrMod = profile?.rol === 'conductor';
 
@@ -17,22 +26,41 @@ export default function Room() {
         sendMessage(text);
     };
 
+    const getTribunaNivel = (count: number) => {
+        if (count < 10) return "Núcleo Duro <10";
+        if (count < 20) return "OAA >10";
+        if (count < 30) return "La Banda Loca >20";
+        if (count < 40) return "La Barra Brava >30";
+        if (count < 50) return "Explotó el Estadio >40";
+        return "PICADÍSIMO >50";
+    };
+
     return (
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-[calc(100vh-8rem)] overflow-hidden">
+
             {/* Background glowing effects */}
             <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-arg-celeste/10 rounded-full blur-[120px] pointer-events-none" />
             <div className="absolute bottom-0 right-1/4 w-[600px] h-[600px] bg-arg-dorado/5 rounded-full blur-[150px] pointer-events-none" />
 
+            {/* Columna Video */}
             <div className="lg:col-span-3 flex flex-col gap-4 z-10">
+
+                {/* Nivel de tribuna */}
+                <div className="text-center text-sm text-arg-celeste font-semibold">
+                    {getTribunaNivel(viewers)}
+                </div>
+
                 <VideoPlayer
                     playbackId={stream.mux_playback_id}
                     isLive={stream.is_live}
                     title={stream.titulo}
                 />
+
                 <TribunaReacciones />
+
             </div>
 
-            {/* Columna Derecha: Chat */}
+            {/* Columna Chat */}
             <div className="lg:col-span-1 h-full overflow-hidden flex flex-col z-10">
                 <Chat
                     messages={messages}
@@ -42,6 +70,7 @@ export default function Room() {
                     onDeleteMessage={deleteMessage}
                 />
             </div>
+
         </div>
     );
 }
