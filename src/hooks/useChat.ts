@@ -51,7 +51,7 @@ export function useChat() {
         fetchMessages();
 
         // 2. Suscribirse a nuevos mensajes via Realtime
-        const channel = supabase.channel('chat_room')
+        const channel = supabase.channel(`chat_room_${currentStreamId}`)
             .on(
                 'postgres_changes',
                 { event: 'INSERT', schema: 'public', table: 'chat_mensajes'},
