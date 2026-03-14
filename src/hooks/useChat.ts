@@ -59,7 +59,7 @@ export function useChat() {
                     // Check if we already added it via optimistic UI
                     if (payload.new.stream_id !== currentStreamId) return;
                     setMessages(prev => {
-                        if (prev.some(m => m.id === payload.new.id || (m.mensaje === payload.new.mensaje && m.user_id === payload.new.user_id && m.type === payload.new.type && m.content === payload.new.content))) {
+                        if (prev.some(m => m.id === payload.new.id)) {
                             return prev;
                         }
                         return [...prev, {
