@@ -45,11 +45,6 @@ export default function Room() {
             {/* Columna Video */}
             <div className="lg:col-span-3 flex flex-col gap-4 z-10">
 
-                {/* Nivel de tribuna */}
-                <div className="text-center text-sm text-arg-celeste font-semibold">
-                    {getTribunaNivel(viewers)}
-                </div>
-
                 <VideoPlayer
                     playbackId={stream.mux_playback_id}
                     isLive={stream.is_live}
