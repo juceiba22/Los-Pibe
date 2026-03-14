@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabase';
 import VideoPlayer from '../components/VideoPlayer';
 import TribunaReacciones from '../components/TribunaReacciones';
 import Chat from '../components/Chat';
@@ -10,14 +11,34 @@ export default function Room() {
     const { messages, sendMessage, sendSticker, deleteMessage } = useChat();
     const stream = useStreamState();
     const { profile } = useAuth();
-
     const [viewers, setViewers] = useState(0);
-
-    // Simulación de viewers (solo para prueba)
     useEffect(() => {
-        const fakeViewers = Math.floor(Math.random() * 60);
-        setViewers(fakeViewers);
-    }, []);
+        const channel = supabase.channel(`stream_${stream.id}`, {
+            config: {
+                presence: {
+                    key: profile?.id || Math.random().toString()
+                }
+            }
+        });
+
+        channel
+            .on('presence', { event: 'sync' }, () => {
+                const state = channel.presenceState();
+                const count = Object.keys(state).length;
+                setViewers(count);
+            })
+            .subscribe(async (status) => {
+                if (status === 'SUBSCRIBED') {
+                    await channel.track({
+                        user: profile?.username || 'anon'
+                    });
+                }
+            });
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [stream.id]);
 
     // Check if the current user has moderation capabilities
     const isAdminOrMod = profile?.rol === 'conductor';
@@ -49,6 +70,7 @@ export default function Room() {
                     playbackId={stream.mux_playback_id}
                     isLive={stream.is_live}
                     title={stream.titulo}
+                    viewers={viewers}
                 />
 
                 <TribunaReacciones />

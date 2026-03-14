@@ -5,10 +5,11 @@ interface VideoPlayerProps {
     playbackId: string;
     isLive: boolean;
     title?: string;
+    viewers: number;
 }
 
-export default function VideoPlayer({ playbackId, isLive, title }: VideoPlayerProps) {
-    if (!isLive) {
+export default function VideoPlayer({ playbackId, isLive, title, viewers }: VideoPlayerProps) {
+    if (!isLive || !playbackId) {
         return (
             <div className="w-full aspect-video bg-zinc-900/60 backdrop-blur-md rounded-2xl border border-zinc-800/50 flex flex-col items-center justify-center relative overflow-hidden shadow-2xl">
                 <div className="absolute inset-0 bg-gradient-to-tr from-arg-celeste/5 to-transparent z-0"></div>
@@ -41,7 +42,7 @@ export default function VideoPlayer({ playbackId, isLive, title }: VideoPlayerPr
                 </div>
                 {/* Viewer count overlaid on video */}
                 <div className="glass-panel px-4 py-2 rounded-xl backdrop-blur-md bg-zinc-900/40 border-zinc-700/30 pointer-events-auto">
-                    <ViewerCount count={1420} />
+                    <ViewerCount count={viewers} />
                 </div>
             </div>
 
