@@ -19,7 +19,7 @@ export function useAuth() {
         });
 
         // Escuchamos cambios en la autenticacion
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange((_event, session) => {
             setUser(session?.user ?? null);
             if (session?.user) {
                 fetchProfile(session.user.id);
@@ -29,7 +29,24 @@ export function useAuth() {
             }
         });
 
-        return () => subscription.unsubscribe();
+        // Suscripción en tiempo real para cambios de perfil (especialmente roles)
+        const profileSubscription = supabase
+            .channel('current-user-profile')
+            .on(
+                'postgres_changes',
+                { event: 'UPDATE', schema: 'public', table: 'perfiles' },
+                (payload) => {
+                    if (user && payload.new.id === user.id) {
+                        setProfile(payload.new as any);
+                    }
+                }
+            )
+            .subscribe();
+
+        return () => {
+            authSubscription.unsubscribe();
+            supabase.removeChannel(profileSubscription);
+        };
     }, []);
 
     const fetchProfile = async (userId: string) => {
