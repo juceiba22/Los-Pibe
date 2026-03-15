@@ -6,6 +6,8 @@ import Chat from '../components/Chat';
 import { useChat } from '../hooks/useChat';
 import { useStreamState } from '../hooks/useStreamState';
 import { useAuth } from '../hooks/useAuth';
+import { ForumProvider } from '../features/forum/context/ForumContext';
+import { ForumContainer } from '../features/forum/components/ForumContainer';
 
 export default function Room() {
     const { messages, sendMessage, sendSticker, deleteMessage } = useChat();
@@ -57,37 +59,43 @@ export default function Room() {
     };
 
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-[calc(100vh-8rem)] overflow-hidden">
+        <ForumProvider>
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-[calc(100vh-8rem)] overflow-hidden">
 
-            {/* Background glowing effects */}
-            <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-arg-celeste/10 rounded-full blur-[120px] pointer-events-none" />
-            <div className="absolute bottom-0 right-1/4 w-[600px] h-[600px] bg-arg-dorado/5 rounded-full blur-[150px] pointer-events-none" />
+                {/* Background glowing effects */}
+                <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-arg-celeste/10 rounded-full blur-[120px] pointer-events-none" />
+                <div className="absolute bottom-0 right-1/4 w-[600px] h-[600px] bg-arg-dorado/5 rounded-full blur-[150px] pointer-events-none" />
 
-            {/* Columna Video */}
-            <div className="lg:col-span-3 flex flex-col gap-4 z-10">
+                {/* Columna Video + Foro */}
+                <div className="lg:col-span-3 flex flex-col gap-4 z-10 overflow-y-auto custom-scrollbar pb-10">
 
-                <VideoPlayer
-                    playbackId={stream.mux_playback_id}
-                    isLive={stream.is_live}
-                    title={stream.titulo}
-                    viewers={viewers}
-                />
+                    <VideoPlayer
+                        playbackId={stream.mux_playback_id}
+                        isLive={stream.is_live}
+                        title={stream.titulo}
+                        viewers={viewers}
+                    />
 
-                <TribunaReacciones />
+                    <TribunaReacciones />
+
+                    <div className="mt-6">
+                        <ForumContainer />
+                    </div>
+
+                </div>
+
+                {/* Columna Chat */}
+                <div className="lg:col-span-1 h-full overflow-hidden flex flex-col z-10">
+                    <Chat
+                        messages={messages}
+                        onSendMessage={handleSendMessage}
+                        onSendSticker={sendSticker}
+                        isAdminOrMod={isAdminOrMod}
+                        onDeleteMessage={deleteMessage}
+                    />
+                </div>
 
             </div>
-
-            {/* Columna Chat */}
-            <div className="lg:col-span-1 h-full overflow-hidden flex flex-col z-10">
-                <Chat
-                    messages={messages}
-                    onSendMessage={handleSendMessage}
-                    onSendSticker={sendSticker}
-                    isAdminOrMod={isAdminOrMod}
-                    onDeleteMessage={deleteMessage}
-                />
-            </div>
-
-        </div>
+        </ForumProvider>
     );
 }
