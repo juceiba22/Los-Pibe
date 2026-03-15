@@ -99,7 +99,7 @@ export default function Admin() {
         setAssignResult(null);
 
         try {
-            const response = await fetch('http://localhost:3001/api/users/set-pastor', {
+            const response = await fetch('/api/users/set-pastor', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username: targetUsername.trim() })
