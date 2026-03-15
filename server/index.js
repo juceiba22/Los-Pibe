@@ -138,6 +138,34 @@ const ensureParticipant = async (forum_id, user_id) => {
   }
 };
 
+app.post('/api/users/set-pastor', async (req, res) => {
+  try {
+    const { username } = req.body;
+    
+    const { data: profile, error: fetchError } = await supabase
+      .from('perfiles')
+      .select('id')
+      .eq('username', username)
+      .single();
+      
+    if (fetchError || !profile) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+    
+    const { data, error } = await supabase
+      .from('perfiles')
+      .update({ rol: 'pastor' })
+      .eq('id', profile.id)
+      .select()
+      .single();
+      
+    if (error) throw error;
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/forums/create', async (req, res) => {
   try {
     const { topic, objective, created_by, duration_seconds } = req.body;

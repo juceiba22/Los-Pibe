@@ -7,6 +7,8 @@ import Login from './pages/Login';
 import Invite from './pages/Invite';
 import { useAuth } from './hooks/useAuth';
 import RequireRole from './components/RequireRole';
+import Foro from './pages/Foro';
+import PastorDashboard from './pages/PastorDashboard';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
     const { user, loading } = useAuth();
@@ -29,6 +31,16 @@ function App() {
                         <Route path="/room" element={
                             <ProtectedRoute>
                                 <Room />
+                            </ProtectedRoute>
+                        } />
+                        <Route path="/foro" element={
+                            <ProtectedRoute>
+                                <Foro />
+                            </ProtectedRoute>
+                        } />
+                        <Route path="/pastor" element={
+                            <ProtectedRoute>
+                                <PastorDashboard />
                             </ProtectedRoute>
                         } />
                         <Route path="/admin" element={

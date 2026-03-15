@@ -6,8 +6,6 @@ import Chat from '../components/Chat';
 import { useChat } from '../hooks/useChat';
 import { useStreamState } from '../hooks/useStreamState';
 import { useAuth } from '../hooks/useAuth';
-import { ForumProvider } from '../features/forum/context/ForumContext';
-import { ForumContainer } from '../features/forum/components/ForumContainer';
 
 export default function Room() {
     const { messages, sendMessage, sendSticker, deleteMessage } = useChat();
@@ -59,8 +57,7 @@ export default function Room() {
     };
 
     return (
-        <ForumProvider>
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-[calc(100vh-8rem)] overflow-hidden">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-[calc(100vh-8rem)] overflow-hidden">
 
                 {/* Background glowing effects */}
                 <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-arg-celeste/10 rounded-full blur-[120px] pointer-events-none" />
@@ -78,10 +75,6 @@ export default function Room() {
 
                     <TribunaReacciones />
 
-                    <div className="mt-6">
-                        <ForumContainer />
-                    </div>
-
                 </div>
 
                 {/* Columna Chat */}
@@ -96,6 +89,5 @@ export default function Room() {
                 </div>
 
             </div>
-        </ForumProvider>
     );
 }

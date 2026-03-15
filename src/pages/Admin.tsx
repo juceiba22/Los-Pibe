@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import CreatorDashboard from '../components/CreatorDashboard';
 import { useAuth } from '../hooks/useAuth';
-import { Copy, TicketPlus } from 'lucide-react';
+import { Copy, TicketPlus, UserPlus } from 'lucide-react';
 import { ForumProvider } from '../features/forum/context/ForumContext';
 import ForumAdminPanel from '../features/forum/components/ForumAdminPanel';
 
@@ -22,6 +22,11 @@ export default function Admin() {
     }
     const [invitations, setInvitations] = useState<Invitation[]>([]);
     const [generatingInvite, setGeneratingInvite] = useState(false);
+
+    // Pastor Assignment
+    const [targetUsername, setTargetUsername] = useState('');
+    const [assigningPastor, setAssigningPastor] = useState(false);
+    const [assignResult, setAssignResult] = useState<{success?: boolean, message?: string} | null>(null);
 
     useEffect(() => {
         const fetchState = async () => {
@@ -86,6 +91,32 @@ export default function Admin() {
             if (newLiveStatus !== undefined) setIsLive(newLiveStatus);
         }
         setSaving(false);
+    };
+
+    const handleAssignPastor = async () => {
+        if (!targetUsername.trim()) return;
+        setAssigningPastor(true);
+        setAssignResult(null);
+
+        try {
+            const response = await fetch('http://localhost:3001/api/users/set-pastor', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: targetUsername.trim() })
+            });
+
+            if (!response.ok) {
+                const errData = await response.json();
+                throw new Error(errData.error || 'Error al asignar rol');
+            }
+
+            setAssignResult({ success: true, message: 'Usuario asignado como Pastor exitosamente.' });
+            setTargetUsername('');
+        } catch (err: any) {
+            setAssignResult({ success: false, message: err.message });
+        } finally {
+            setAssigningPastor(false);
+        }
     };
 
     const handleGenerateInvite = async () => {
@@ -169,6 +200,42 @@ export default function Admin() {
                                 ))}
                             </div>
                         </div>
+                    )}
+                </div>
+
+                {/* Asignación de Pastor */}
+                <div className="glass-panel border border-zinc-800/80 rounded-2xl p-6 bg-zinc-900/40 backdrop-blur-xl">
+                    <div className="flex items-center gap-3 mb-4">
+                        <div className="p-2 bg-emerald-500/10 rounded-lg">
+                            <UserPlus className="w-5 h-5 text-emerald-400" />
+                        </div>
+                        <div>
+                            <h2 className="text-lg font-bold text-white">Asignar Pastor</h2>
+                            <p className="text-xs text-zinc-400">Otorgale permisos a un usuario para crear Foros Comunitarios.</p>
+                        </div>
+                    </div>
+                    <div className="flex flex-col sm:flex-row gap-4">
+                        <div className="flex-1">
+                            <input
+                                type="text"
+                                value={targetUsername}
+                                onChange={(e) => setTargetUsername(e.target.value)}
+                                placeholder="Nombre de usuario"
+                                className="w-full bg-zinc-950/50 border border-zinc-800/80 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/50 transition-all placeholder:text-zinc-600"
+                            />
+                        </div>
+                        <button
+                            onClick={handleAssignPastor}
+                            disabled={assigningPastor}
+                            className="px-6 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-bold transition-all shadow-lg hover:shadow-emerald-500/20 active:scale-95 disabled:opacity-50 whitespace-nowrap"
+                        >
+                            {assigningPastor ? 'Asignando...' : 'Hacer Pastor'}
+                        </button>
+                    </div>
+                    {assignResult && (
+                        <p className={`mt-3 text-sm ${assignResult.success ? 'text-green-400' : 'text-red-400'}`}>
+                            {assignResult.message}
+                        </p>
                     )}
                 </div>
 
