@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useTribuna, TipoReaccion } from '../hooks/useTribuna';
+import { STADIUM_THEMES, StadiumTheme } from './stadiumThemes';
 
 interface StadiumLayoutProps {
     children: React.ReactNode;
@@ -28,7 +29,29 @@ const playBeep = () => {
     }
 };
 
+interface Particle {
+    id: number;
+    emoji: string;
+    style: React.CSSProperties;
+    className: string;
+}
+
 export default function StadiumLayout({ children, viewers }: StadiumLayoutProps) {
+    // Theme State - Persistent via localStorage
+    const [themeId, setThemeId] = useState<string>(() => {
+        return localStorage.getItem('stadium_theme') || 'coloso';
+    });
+    const [showThemeSelector, setShowThemeSelector] = useState(false);
+
+    // Get current theme object
+    const theme = STADIUM_THEMES.find(t => t.id === themeId) || STADIUM_THEMES[0];
+
+    const changeTheme = (newId: string) => {
+        setThemeId(newId);
+        localStorage.setItem('stadium_theme', newId);
+        setShowThemeSelector(false);
+    };
+
     const { counts, sendReaction } = useTribuna(1);
     const [cooldownMsg, setCooldownMsg] = useState('');
     const [clickedReaction, setClickedReaction] = useState<TipoReaccion | null>(null);
@@ -39,20 +62,96 @@ export default function StadiumLayout({ children, viewers }: StadiumLayoutProps)
         JAJA: false
     });
 
-    // Pulse count badge when counts increment
-    useEffect(() => {
-        const updated: Partial<Record<TipoReaccion, boolean>> = {};
-        let changed = false;
+    const [particles, setParticles] = useState<Particle[]>([]);
 
-        (Object.keys(counts) as TipoReaccion[]).forEach((key) => {
-            if (counts[key] > lastCounts[key]) {
-                updated[key] = true;
-                changed = true;
+    // Particle Spawner
+    const spawnParticles = useCallback((tipo: TipoReaccion, count: number = 3) => {
+        let emoji = '🧉';
+        let className = 'animate-float-down';
+        if (tipo === 'AGUANTE') {
+            emoji = '🔥';
+            className = 'animate-float-right';
+        } else if (tipo === 'JAJA') {
+            emoji = '😂';
+            className = 'animate-float-left';
+        }
+
+        const newParticles = Array.from({ length: count }).map((_, idx) => {
+            const id = Date.now() + Math.random();
+            let style: React.CSSProperties = {};
+
+            // Random horizontal/vertical drifts & delays for natural stadium crowd throwing feel
+            const driftVal = `${(Math.random() - 0.5) * 120}px`;
+            const delayVal = `${Math.random() * 0.2}s`;
+            const scaleVal = 0.8 + Math.random() * 0.8;
+
+            if (tipo === 'BANCO') {
+                // Top to Bottom
+                style = {
+                    left: `${20 + Math.random() * 60}%`,
+                    top: `-20px`,
+                    transform: `scale(${scaleVal})`,
+                    animationDelay: delayVal,
+                    '--drift': driftVal,
+                } as React.CSSProperties;
+            } else if (tipo === 'AGUANTE') {
+                // Left to Right
+                style = {
+                    left: `-20px`,
+                    top: `${15 + Math.random() * 70}%`,
+                    transform: `scale(${scaleVal})`,
+                    animationDelay: delayVal,
+                    '--drift': driftVal,
+                } as React.CSSProperties;
+            } else if (tipo === 'JAJA') {
+                // Right to Left
+                style = {
+                    right: `-20px`,
+                    top: `${15 + Math.random() * 70}%`,
+                    transform: `scale(${scaleVal})`,
+                    animationDelay: delayVal,
+                    '--drift': driftVal,
+                } as React.CSSProperties;
+            }
+
+            return { id, emoji, style, className };
+        });
+
+        setParticles(prev => {
+            const combined = [...prev, ...newParticles];
+            if (combined.length > 40) {
+                return combined.slice(combined.length - 40);
+            }
+            return combined;
+        });
+
+        // Cleanup particles after animation runs (1.3 seconds)
+        newParticles.forEach(p => {
+            setTimeout(() => {
+                setParticles(prev => prev.filter(x => x.id !== p.id));
+            }, 1300);
+        });
+    }, []);
+
+    // Monitor counts to trigger particles and pulses (including live updates from other users)
+    useEffect(() => {
+        const keys: TipoReaccion[] = ['BANCO', 'AGUANTE', 'JAJA'];
+        let countsChanged = false;
+        const updatedPulses: Partial<Record<TipoReaccion, boolean>> = {};
+
+        keys.forEach(key => {
+            const diff = counts[key] - lastCounts[key];
+            if (diff > 0) {
+                countsChanged = true;
+                updatedPulses[key] = true;
+                // Spawn emojis based on how many votes were added
+                const spawnCount = Math.min(diff, 5);
+                spawnParticles(key, spawnCount);
             }
         });
 
-        if (changed) {
-            setPulseStates(prev => ({ ...prev, ...updated }));
+        if (countsChanged) {
+            setPulseStates(prev => ({ ...prev, ...updatedPulses }));
             setLastCounts(counts);
 
             const timer = setTimeout(() => {
@@ -60,7 +159,7 @@ export default function StadiumLayout({ children, viewers }: StadiumLayoutProps)
             }, 600);
             return () => clearTimeout(timer);
         }
-    }, [counts, lastCounts]);
+    }, [counts, lastCounts, spawnParticles]);
 
     const handleReaction = async (tipo: TipoReaccion) => {
         setClickedReaction(tipo);
@@ -82,12 +181,13 @@ export default function StadiumLayout({ children, viewers }: StadiumLayoutProps)
     const totalReactions = counts.BANCO + counts.AGUANTE + counts.JAJA;
 
     const getTribunaNivel = (count: number) => {
-        if (count < 10) return "Núcleo Duro 🧉";
-        if (count < 25) return "Los Pibes Oficiales 🔥";
-        if (count < 50) return "La Banda de la Esquina 🥁";
-        if (count < 100) return "La Barra Brava Copada 📣";
-        if (count < 200) return "Explotó el Estadio 🏟️";
-        return "PICADÍSIMO TOTAL ⚡⚡";
+        if (count < 10) return "Silencio en la Platea 🤫";
+        if (count < 25) return "Plateistas Aplaudiendo 👏";
+        if (count < 50) return "Los Pibes Oficiales 🔥";
+        if (count < 100) return "La Banda del Trapo 🥁";
+        if (count < 200) return "La Barra Brava Copada 📣";
+        if (count < 400) return "Explotó el Estadio 🏟️⚡";
+        return "¡PICADÍSIMO HISTÓRICO! 🏆✨";
     };
 
     const ads = [
@@ -100,7 +200,7 @@ export default function StadiumLayout({ children, viewers }: StadiumLayoutProps)
     ];
 
     return (
-        <div className="flex flex-col w-full h-full gap-4 relative">
+        <div className={`flex flex-col w-full h-full gap-4 relative transition-colors duration-500 p-2 md:p-4 rounded-3xl bg-gradient-to-br ${theme.bgGradient}`}>
             <style>{`
                 @keyframes marquee {
                     0% { transform: translateX(100%); }
@@ -111,50 +211,126 @@ export default function StadiumLayout({ children, viewers }: StadiumLayoutProps)
                     white-space: nowrap;
                     animation: marquee 30s linear infinite;
                 }
-                .stadium-border {
+                .stadium-border-pro {
                     position: relative;
+                    transition: border-color 0.5s ease, box-shadow 0.5s ease;
                 }
-                .stadium-border::before {
+                .stadium-border-pro::before {
                     content: '';
                     position: absolute;
-                    inset: -2px;
+                    inset: -3px;
                     border-radius: 1.1rem;
-                    background: linear-gradient(90deg, #10B981, #059669, #10B981);
+                    background: linear-gradient(90deg, ${theme.accentColor}, #10B981, ${theme.accentColor});
                     z-index: -1;
-                    opacity: 0.4;
-                    filter: blur(4px);
+                    opacity: 0.35;
+                    filter: blur(5px);
+                    transition: background 0.5s ease;
+                }
+                @keyframes floatDown {
+                    0% { transform: translateY(-30px) scale(0.6); opacity: 0; }
+                    20% { opacity: 1; }
+                    100% { transform: translateY(180px) translateX(var(--drift)) scale(1.4); opacity: 0; }
+                }
+                @keyframes floatRight {
+                    0% { transform: translateX(-30px) scale(0.6); opacity: 0; }
+                    20% { opacity: 1; }
+                    100% { transform: translateX(280px) translateY(var(--drift)) scale(1.4); opacity: 0; }
+                }
+                @keyframes floatLeft {
+                    0% { transform: translateX(30px) scale(0.6); opacity: 0; }
+                    20% { opacity: 1; }
+                    100% { transform: translateX(-280px) translateY(var(--drift)) scale(1.4); opacity: 0; }
+                }
+                .animate-float-down { animation: floatDown 1.2s cubic-bezier(0.1, 0.8, 0.3, 1) forwards; }
+                .animate-float-right { animation: floatRight 1.2s cubic-bezier(0.1, 0.8, 0.3, 1) forwards; }
+                .animate-float-left { animation: floatLeft 1.2s cubic-bezier(0.1, 0.8, 0.3, 1) forwards; }
+                .vertical-text {
+                    writing-mode: vertical-lr;
+                    text-orientation: mixed;
+                    transform: rotate(180deg);
                 }
             `}</style>
 
             {/* TRIBUNA NORTE: Tablero LED superior */}
-            <div className="w-full bg-zinc-900/90 backdrop-blur-md border border-zinc-800/80 rounded-xl p-3 shadow-xl flex items-center justify-between gap-4">
-                <div className="flex items-center gap-2">
-                    <div className="w-2.5 h-2.5 rounded-full bg-red-600 animate-ping" />
-                    <span className="text-xs font-mono font-bold tracking-widest text-zinc-400 uppercase">
-                        TRIBUNA NORTE
-                    </span>
+            <div 
+                className={`relative z-30 w-full border rounded-xl p-3 shadow-2xl flex items-center justify-between gap-4 transition-all duration-500 ${theme.norte.panelBg}`}
+                style={{ backgroundImage: theme.stadiumTexture }}
+            >
+                {/* Iluminación LED interna decorativa */}
+                <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent pointer-events-none rounded-xl" />
+
+                <div className="flex items-center gap-3 z-10">
+                    <div className="relative flex h-3 w-3">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                    </div>
+                    <div className="flex flex-col">
+                        <span className="text-[10px] font-mono font-black tracking-widest text-zinc-500 uppercase leading-none">
+                            TRIBUNA NORTE
+                        </span>
+                        <span className="text-xs font-bold text-white tracking-wide mt-1 hidden sm:inline">
+                            TABLERO DE CONTROL LOCAL
+                        </span>
+                    </div>
                 </div>
                 
                 {/* Scoreboard style reaction button for BANCO */}
-                <button
-                    onClick={() => handleReaction('BANCO')}
-                    className={`flex items-center gap-2 px-5 py-2 rounded-lg bg-zinc-950 border border-zinc-800 hover:border-emerald-500/50 hover:bg-zinc-900 transition-all duration-150 active:scale-95 shadow-inner group relative overflow-hidden ${
-                        clickedReaction === 'BANCO' ? 'scale-105 border-emerald-500 ring-2 ring-emerald-500/20' : ''
-                    }`}
-                >
-                    <span className="text-xl group-hover:scale-120 transition-transform">🧉</span>
-                    <span className="font-bold text-sm tracking-wide text-zinc-300 group-hover:text-white">
-                        BANCO
-                    </span>
-                    <span className={`ml-2 font-mono font-black px-2 py-0.5 rounded bg-zinc-855 text-emerald-400 border border-emerald-500/20 transition-transform duration-200 ${
-                        pulseStates.BANCO ? 'scale-125 bg-emerald-950 text-emerald-300' : ''
-                    }`}>
-                        {counts.BANCO}
-                    </span>
-                </button>
+                <div className="flex items-center gap-2 z-10">
+                    <button
+                        onClick={() => handleReaction('BANCO')}
+                        className={`flex items-center gap-2 px-5 py-2.5 rounded-lg border transition-all duration-150 active:scale-95 shadow-lg group relative overflow-hidden font-bold text-sm tracking-wide ${theme.norte.bancoBtnClass} ${
+                            clickedReaction === 'BANCO' ? 'scale-105 ring-2 ring-emerald-500/20' : ''
+                        }`}
+                    >
+                        <span className="text-xl group-hover:scale-125 transition-transform inline-block">🧉</span>
+                        <span className="group-hover:text-white transition-colors">BANCO</span>
+                        <span className={`ml-2 font-mono font-black px-2 py-0.5 rounded transition-transform duration-200 ${
+                            pulseStates.BANCO ? 'scale-130 bg-emerald-950 text-white' : 'bg-black/40 text-emerald-400 border border-emerald-500/10'
+                        }`}>
+                            {counts.BANCO}
+                        </span>
+                    </button>
+                </div>
 
-                <div className="hidden sm:flex items-center gap-2 text-xs font-mono text-zinc-500">
-                    <span>ESTADIO ID: 01</span>
+                {/* SELECTOR DE ESTADIO (Dropdown flotante) */}
+                <div className="relative z-20">
+                    <button 
+                        onClick={() => setShowThemeSelector(!showThemeSelector)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono font-bold bg-zinc-950 hover:bg-zinc-900 border border-zinc-800 hover:border-zinc-700 text-zinc-300 rounded-lg transition-colors"
+                        title="Cambiar Estadio"
+                    >
+                        <span>🏟️</span>
+                        <span className="hidden md:inline">{theme.name}</span>
+                        <span className="text-[10px] text-zinc-500">▼</span>
+                    </button>
+
+                    {showThemeSelector && (
+                        <>
+                            <div className="fixed inset-0 z-10" onClick={() => setShowThemeSelector(false)} />
+                            <div className="absolute right-0 mt-2 w-64 bg-zinc-950 border border-zinc-800 rounded-xl shadow-2xl z-20 overflow-hidden py-1 animate-fade-in">
+                                <div className="px-3 py-2 text-[10px] font-mono text-zinc-500 uppercase tracking-widest border-b border-zinc-900">
+                                    Seleccionar Estadio
+                                </div>
+                                {STADIUM_THEMES.map((st) => (
+                                    <button
+                                        key={st.id}
+                                        onClick={() => changeTheme(st.id)}
+                                        className={`w-full text-left px-3 py-2.5 hover:bg-zinc-900 flex flex-col gap-0.5 transition-colors ${
+                                            st.id === themeId ? 'bg-zinc-900/60 border-l-2 border-emerald-500' : ''
+                                        }`}
+                                    >
+                                        <div className="text-xs font-bold text-white flex items-center justify-between">
+                                            <span>{st.name}</span>
+                                            {st.id === themeId && <span className="text-emerald-400 text-2xs">ACTIVO</span>}
+                                        </div>
+                                        <div className="text-[10px] text-zinc-400 font-sans leading-tight">
+                                            {st.description}
+                                        </div>
+                                    </button>
+                                ))}
+                            </div>
+                        </>
+                    )}
                 </div>
             </div>
 
@@ -162,54 +338,94 @@ export default function StadiumLayout({ children, viewers }: StadiumLayoutProps)
             <div className="grid grid-cols-1 md:grid-cols-[80px_1fr_80px] gap-4 items-stretch w-full">
                 
                 {/* TRIBUNA OESTE: Stand Lateral Izquierdo (Sólo Escritorio) */}
-                <div className="hidden md:flex flex-col items-center justify-center bg-zinc-900/60 backdrop-blur-sm border border-zinc-800/40 rounded-2xl p-2 select-none shadow-md">
-                    <span className="text-[10px] font-mono text-zinc-500 font-bold tracking-wider vertical-text uppercase mb-4">
+                <div 
+                    className={`hidden md:flex flex-col items-center justify-center border rounded-2xl p-2 select-none shadow-2xl relative overflow-hidden transition-all duration-500 ${theme.oeste.panelBg}`}
+                    style={{ backgroundImage: theme.stadiumTexture }}
+                >
+                    <div className="absolute inset-x-0 top-0 h-8 bg-gradient-to-b from-white/5 to-transparent pointer-events-none" />
+                    
+                    <span className={`text-[10px] font-mono font-black tracking-widest vertical-text uppercase mb-6 ${theme.oeste.textColor}`}>
                         TRIBUNA OESTE
                     </span>
+                    
                     <button
                         onClick={() => handleReaction('AGUANTE')}
-                        className={`flex flex-col items-center gap-3 px-3 py-6 rounded-xl bg-gradient-to-b from-orange-600/10 to-red-600/15 border border-orange-500/20 hover:border-orange-500/40 hover:from-orange-600/20 hover:to-red-600/25 transition-all duration-150 active:scale-95 shadow-md w-full group ${
-                            clickedReaction === 'AGUANTE' ? 'scale-105 border-orange-500 ring-2 ring-orange-500/20' : ''
+                        className={`flex flex-col items-center gap-3 px-3 py-6 rounded-xl border transition-all duration-150 active:scale-95 shadow-2xl w-full group ${theme.oeste.aguanteBtnClass} ${
+                            clickedReaction === 'AGUANTE' ? 'scale-105 ring-2 ring-orange-500/20' : ''
                         }`}
                         title="Reaccionar AGUANTE (Fuego)"
                     >
-                        <span className="text-3xl group-hover:animate-bounce transition-transform">🔥</span>
-                        <span className="text-[10px] font-black tracking-wider text-orange-400/90 group-hover:text-orange-300 uppercase">
+                        <span className="text-3xl group-hover:animate-bounce transition-transform duration-200">🔥</span>
+                        <span className="text-[10px] font-black tracking-wider uppercase">
                             AGUANTE
                         </span>
-                        <span className={`font-mono font-black text-xs px-2 py-0.5 rounded-full bg-orange-950/80 text-orange-300 border border-orange-500/30 transition-transform duration-200 ${
-                            pulseStates.AGUANTE ? 'scale-125 bg-orange-900 text-white' : ''
+                        <span className={`font-mono font-black text-xs px-2 py-0.5 rounded-full transition-transform duration-200 ${
+                            pulseStates.AGUANTE ? 'scale-130 bg-orange-500 text-white font-black' : 'bg-black/40 border border-orange-500/10'
                         }`}>
                             {counts.AGUANTE}
                         </span>
                     </button>
                 </div>
 
-                {/* LA CANCHA: Centro (VideoPlayer) */}
-                <div className="stadium-border w-full aspect-video bg-zinc-950 p-1.5 shadow-[0_0_25px_rgba(16,185,129,0.25)] rounded-2xl transition-all duration-300 hover:shadow-[0_0_35px_rgba(16,185,129,0.35)] flex items-center justify-center overflow-hidden">
-                    <div className="w-full h-full rounded-xl overflow-hidden relative">
+                {/* LA CANCHA (CENTRO): Contenedor de Video con Brillo y Focos */}
+                <div className={`stadium-border-pro w-full aspect-video bg-zinc-950 p-1.5 rounded-2xl transition-all duration-500 flex items-center justify-center overflow-hidden border-2 ${theme.canchaBorderClass} ${theme.glowClass}`}>
+                    
+                    <div className="w-full h-full rounded-xl overflow-hidden relative bg-black">
                         {children}
+
+                        {/* REFLECTORES DE ILUMINACIÓN (Spotlights en Esquinas) */}
+                        <div 
+                            className="absolute top-0 left-0 w-64 h-64 pointer-events-none mix-blend-screen opacity-40 transition-all duration-500" 
+                            style={{
+                                background: `radial-gradient(circle at 0% 0%, ${theme.spotlightColor}, transparent 70%)`
+                            }}
+                        />
+                        <div 
+                            className="absolute top-0 right-0 w-64 h-64 pointer-events-none mix-blend-screen opacity-40 transition-all duration-500" 
+                            style={{
+                                background: `radial-gradient(circle at 100% 0%, ${theme.spotlightColor}, transparent 70%)`
+                            }}
+                        />
+
+                        {/* PARTÍCULAS / EMOJIS VOLADORES EN LA CANCHA */}
+                        <div className="absolute inset-0 z-20 pointer-events-none overflow-hidden">
+                            {particles.map(p => (
+                                <div
+                                    key={p.id}
+                                    className={`absolute text-2xl filter drop-shadow-lg select-none z-20 ${p.className}`}
+                                    style={p.style}
+                                >
+                                    {p.emoji}
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 </div>
 
                 {/* TRIBUNA ESTE: Stand Lateral Derecho (Sólo Escritorio) */}
-                <div className="hidden md:flex flex-col items-center justify-center bg-zinc-900/60 backdrop-blur-sm border border-zinc-800/40 rounded-2xl p-2 select-none shadow-md">
-                    <span className="text-[10px] font-mono text-zinc-500 font-bold tracking-wider vertical-text uppercase mb-4">
+                <div 
+                    className={`hidden md:flex flex-col items-center justify-center border rounded-2xl p-2 select-none shadow-2xl relative overflow-hidden transition-all duration-500 ${theme.este.panelBg}`}
+                    style={{ backgroundImage: theme.stadiumTexture }}
+                >
+                    <div className="absolute inset-x-0 top-0 h-8 bg-gradient-to-b from-white/5 to-transparent pointer-events-none" />
+                    
+                    <span className={`text-[10px] font-mono font-black tracking-widest vertical-text uppercase mb-6 ${theme.este.textColor}`}>
                         TRIBUNA ESTE
                     </span>
+                    
                     <button
                         onClick={() => handleReaction('JAJA')}
-                        className={`flex flex-col items-center gap-3 px-3 py-6 rounded-xl bg-gradient-to-b from-yellow-500/10 to-amber-600/15 border border-yellow-500/20 hover:border-yellow-500/40 hover:from-yellow-500/20 hover:to-amber-600/25 transition-all duration-150 active:scale-95 shadow-md w-full group ${
-                            clickedReaction === 'JAJA' ? 'scale-105 border-yellow-500 ring-2 ring-yellow-500/20' : ''
+                        className={`flex flex-col items-center gap-3 px-3 py-6 rounded-xl border transition-all duration-150 active:scale-95 shadow-2xl w-full group ${theme.este.jajaBtnClass} ${
+                            clickedReaction === 'JAJA' ? 'scale-105 ring-2 ring-yellow-500/20' : ''
                         }`}
                         title="Reaccionar JAJA (Risa)"
                     >
-                        <span className="text-3xl group-hover:animate-bounce transition-transform">😂</span>
-                        <span className="text-[10px] font-black tracking-wider text-yellow-400/90 group-hover:text-yellow-300 uppercase">
+                        <span className="text-3xl group-hover:animate-bounce transition-transform duration-200">😂</span>
+                        <span className="text-[10px] font-black tracking-wider uppercase">
                             JAJA
                         </span>
-                        <span className={`font-mono font-black text-xs px-2 py-0.5 rounded-full bg-yellow-950/80 text-yellow-300 border border-yellow-500/30 transition-transform duration-200 ${
-                            pulseStates.JAJA ? 'scale-125 bg-yellow-900 text-white' : ''
+                        <span className={`font-mono font-black text-xs px-2 py-0.5 rounded-full transition-transform duration-200 ${
+                            pulseStates.JAJA ? 'scale-130 bg-yellow-500 text-white font-black' : 'bg-black/40 border border-yellow-500/10'
                         }`}>
                             {counts.JAJA}
                         </span>
@@ -218,17 +434,17 @@ export default function StadiumLayout({ children, viewers }: StadiumLayoutProps)
             </div>
 
             {/* MOBILE REACTIONS CONTROL: Solo visible en pantallas móviles / tablets */}
-            <div className="flex md:hidden gap-3 w-full justify-between items-center bg-zinc-900/80 backdrop-blur-md p-3 rounded-xl border border-zinc-800/80 shadow-lg">
+            <div className={`flex md:hidden gap-3 w-full justify-between items-center backdrop-blur-md p-3 rounded-xl border shadow-lg z-10 ${theme.sur.panelBg}`}>
                 {/* AGUANTE Button (Mobile) */}
                 <button
                     onClick={() => handleReaction('AGUANTE')}
-                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg bg-orange-600/10 border border-orange-500/20 active:scale-95 transition-all ${
-                        clickedReaction === 'AGUANTE' ? 'bg-orange-600/25 border-orange-500' : ''
+                    className={`flex-1 flex items-center justify-center gap-2 py-3 px-3 rounded-lg bg-orange-600/10 border border-orange-500/20 active:scale-95 transition-all text-orange-400 font-bold ${
+                        clickedReaction === 'AGUANTE' ? 'bg-orange-600/25 border-orange-500 scale-95' : ''
                     }`}
                 >
                     <span className="text-xl">🔥</span>
-                    <span className="text-xs font-bold text-orange-400">AGUANTE</span>
-                    <span className={`text-[10px] font-mono bg-orange-950 text-orange-300 px-1.5 py-0.5 rounded transition-transform ${
+                    <span className="text-xs">AGUANTE</span>
+                    <span className={`text-xs font-mono bg-orange-950 text-orange-300 px-1.5 py-0.5 rounded transition-transform ${
                         pulseStates.AGUANTE ? 'scale-120 font-black' : ''
                     }`}>
                         {counts.AGUANTE}
@@ -238,13 +454,13 @@ export default function StadiumLayout({ children, viewers }: StadiumLayoutProps)
                 {/* JAJA Button (Mobile) */}
                 <button
                     onClick={() => handleReaction('JAJA')}
-                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg bg-yellow-600/10 border border-yellow-500/20 active:scale-95 transition-all ${
-                        clickedReaction === 'JAJA' ? 'bg-yellow-600/25 border-yellow-500' : ''
+                    className={`flex-1 flex items-center justify-center gap-2 py-3 px-3 rounded-lg bg-yellow-600/10 border border-yellow-500/20 active:scale-95 transition-all text-yellow-400 font-bold ${
+                        clickedReaction === 'JAJA' ? 'bg-yellow-600/25 border-yellow-500 scale-95' : ''
                     }`}
                 >
                     <span className="text-xl">😂</span>
-                    <span className="text-xs font-bold text-yellow-400">JAJA</span>
-                    <span className={`text-[10px] font-mono bg-yellow-950 text-yellow-300 px-1.5 py-0.5 rounded transition-transform ${
+                    <span className="text-xs">JAJA</span>
+                    <span className={`text-xs font-mono bg-yellow-950 text-yellow-300 px-1.5 py-0.5 rounded transition-transform ${
                         pulseStates.JAJA ? 'scale-120 font-black' : ''
                     }`}>
                         {counts.JAJA}
@@ -253,32 +469,38 @@ export default function StadiumLayout({ children, viewers }: StadiumLayoutProps)
             </div>
 
             {/* TRIBUNA SUR: Panel de Estadísticas e Interacción y Publicidad LED */}
-            <div className="w-full bg-zinc-900/90 backdrop-blur-md border border-zinc-800/85 rounded-xl p-4 shadow-xl flex flex-col gap-3">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <div 
+                className={`relative overflow-hidden w-full border rounded-xl p-4 shadow-2xl flex flex-col gap-3 transition-all duration-500 ${theme.sur.panelBg}`}
+                style={{ backgroundImage: theme.stadiumTexture }}
+            >
+                <div className="absolute inset-x-0 top-0 h-8 bg-gradient-to-b from-white/5 to-transparent pointer-events-none" />
+
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 z-10">
+                    
                     {/* Hinchas en la Tribuna */}
-                    <div className="flex items-center gap-2.5">
-                        <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-emerald-400">
+                    <div className="flex items-center gap-3">
+                        <div className={`flex items-center justify-center w-9 h-9 rounded-lg border font-bold text-lg shadow-inner ${theme.sur.statsBg}`}>
                             👥
                         </div>
                         <div>
-                            <div className="text-xs text-zinc-400 font-medium">Hinchas en el Estadio</div>
-                            <div className="text-sm font-black font-mono text-white flex items-center gap-1.5">
+                            <div className="text-[10px] text-zinc-500 font-mono font-black uppercase leading-none">Hinchas Registrados</div>
+                            <div className="text-sm font-black font-mono text-white flex items-center gap-1.5 mt-1">
                                 {viewers}
-                                <span className="text-[10px] font-normal text-emerald-400 tracking-wide bg-emerald-950/65 px-1.5 py-0.2 rounded border border-emerald-500/10 uppercase">
-                                    En la Grada
+                                <span className="text-[9px] font-bold text-emerald-400 bg-emerald-950/70 px-1.5 py-0.5 rounded border border-emerald-500/10 uppercase tracking-wider">
+                                    EN LA TRIBUNA
                                 </span>
                             </div>
                         </div>
                     </div>
 
                     {/* Vibe del Estadio / Nivel del Agite */}
-                    <div className="flex items-center gap-2.5">
-                        <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/25 text-indigo-400">
+                    <div className="flex items-center gap-3">
+                        <div className={`flex items-center justify-center w-9 h-9 rounded-lg border font-bold text-lg shadow-inner ${theme.sur.statsBg}`}>
                             🥁
                         </div>
                         <div>
-                            <div className="text-xs text-zinc-400 font-medium">Nivel del Agite</div>
-                            <div className="text-sm font-black text-indigo-300 font-sans tracking-wide">
+                            <div className="text-[10px] text-zinc-500 font-mono font-black uppercase leading-none">Nivel del Agite</div>
+                            <div className="text-sm font-black text-indigo-300 tracking-wide mt-1">
                                 {getTribunaNivel(totalReactions)}
                             </div>
                         </div>
@@ -286,12 +508,12 @@ export default function StadiumLayout({ children, viewers }: StadiumLayoutProps)
                 </div>
 
                 {/* CARTELERA LED DE PUBLICIDAD (Marquee animado de fútbol) */}
-                <div className="w-full bg-zinc-950/90 rounded-lg p-1.5 border border-zinc-800/60 overflow-hidden relative select-none">
+                <div className="w-full bg-zinc-950/90 rounded-lg p-2 border border-zinc-900/60 overflow-hidden relative select-none z-10 shadow-inner">
                     <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-zinc-950 to-transparent z-10 pointer-events-none" />
                     <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-zinc-950 to-transparent z-10 pointer-events-none" />
                     
                     <div className="w-full overflow-hidden flex whitespace-nowrap">
-                        <div className="animate-marquee text-[10px] font-mono tracking-widest text-emerald-400 uppercase py-0.5 flex gap-12 font-bold shadow-inner">
+                        <div className={`animate-marquee text-[10px] font-mono tracking-widest uppercase py-0.5 flex gap-12 font-bold ${theme.marqueeTextColor}`}>
                             <span>{ads[0]}</span>
                             <span>{ads[1]}</span>
                             <span>{ads[2]}</span>
@@ -304,7 +526,7 @@ export default function StadiumLayout({ children, viewers }: StadiumLayoutProps)
 
                 {/* Mensajes de cooldown / errores de interacción */}
                 {cooldownMsg && (
-                    <div className="text-center text-xs font-semibold text-red-400 bg-red-950/30 border border-red-500/20 py-2 rounded-lg animate-pulse">
+                    <div className="text-center text-xs font-semibold text-red-400 bg-red-950/30 border border-red-500/20 py-2.5 rounded-lg animate-pulse z-10">
                         ⚠️ {cooldownMsg}
                     </div>
                 )}
