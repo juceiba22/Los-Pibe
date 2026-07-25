@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import VideoPlayer from '../components/VideoPlayer';
-import StadiumLayout from '../components/StadiumLayout';
+import EnvironmentLayout from '../components/EnvironmentLayout';
 import Chat from '../components/Chat';
 import { useChat } from '../hooks/useChat';
 import { useStreamState } from '../hooks/useStreamState';
@@ -54,17 +54,17 @@ export default function Room() {
                 <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-arg-celeste/10 rounded-full blur-[120px] pointer-events-none" />
                 <div className="absolute bottom-0 right-1/4 w-[600px] h-[600px] bg-arg-dorado/5 rounded-full blur-[150px] pointer-events-none" />
 
-                {/* Columna Video + Foro (Estadio Digital) */}
+                {/* Columna Video + Foro (Escenario Inmersivo) */}
                 <div className="lg:col-span-3 flex flex-col gap-4 z-10 overflow-y-auto custom-scrollbar pb-10">
 
-                    <StadiumLayout viewers={viewers}>
+                    <EnvironmentLayout viewers={viewers}>
                         <VideoPlayer
                             playbackId={stream.mux_playback_id}
                             isLive={stream.is_live}
                             title={stream.titulo}
                             viewers={viewers}
                         />
-                    </StadiumLayout>
+                    </EnvironmentLayout>
 
                 </div>
 
