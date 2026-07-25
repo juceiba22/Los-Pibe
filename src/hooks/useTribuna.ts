@@ -4,7 +4,7 @@ import { useAuth } from './useAuth';
 
 export type TipoReaccion = 'BANCO' | 'AGUANTE' | 'JAJA';
 
-export function useTribuna(roomId: number = 1) {
+export function useTribuna(streamId?: string) {
     const { user } = useAuth();
     const [counts, setCounts] = useState<Record<TipoReaccion, number>>({
         BANCO: 0,
@@ -16,10 +16,11 @@ export function useTribuna(roomId: number = 1) {
     const [lastReactionTime, setLastReactionTime] = useState<number>(0);
 
     const fetchCounts = useCallback(async () => {
+        if (!streamId) return;
         const { data, error } = await supabase
             .from('reacciones_tribuna')
             .select('tipo_reaccion')
-            .eq('room_id', roomId);
+            .eq('stream_id', streamId);
             
         if (error) {
             console.error('Error fetching reactions:', error);
@@ -33,15 +34,16 @@ export function useTribuna(roomId: number = 1) {
             }
         });
         setCounts(newCounts);
-    }, [roomId]);
+    }, [streamId]);
 
     useEffect(() => {
+        if (!streamId) return;
         fetchCounts();
 
-        const channel = supabase.channel(`tribuna_updates_${roomId}`)
+        const channel = supabase.channel(`tribuna_updates_${streamId}`)
             .on(
                 'postgres_changes',
-                { event: 'INSERT', schema: 'public', table: 'reacciones_tribuna', filter: `room_id=eq.${roomId}` },
+                { event: 'INSERT', schema: 'public', table: 'reacciones_tribuna', filter: `stream_id=eq.${streamId}` },
                 (payload) => {
                     const type = payload.new.tipo_reaccion as TipoReaccion;
                     if (type in counts) {
@@ -60,10 +62,11 @@ export function useTribuna(roomId: number = 1) {
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [roomId, fetchCounts, counts]);
+    }, [streamId, fetchCounts, counts]);
 
     const sendReaction = async (tipo: TipoReaccion) => {
         if (!user) return { success: false, message: 'Must be logged in' };
+        if (!streamId) return { success: false, message: 'No active stream' };
         
         const now = Date.now();
         if (now - lastReactionTime < 8000) {
@@ -75,7 +78,7 @@ export function useTribuna(roomId: number = 1) {
         const { error } = await supabase
             .from('reacciones_tribuna')
             .insert([{
-                room_id: roomId,
+                stream_id: streamId,
                 usuario_id: user.id,
                 tipo_reaccion: tipo
             }]);

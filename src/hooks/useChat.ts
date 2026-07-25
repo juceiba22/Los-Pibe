@@ -14,12 +14,12 @@ export interface Message {
     content?: string;
 }
 
-export function useChat() {
+export function useChat(streamId?: string) {
     const [messages, setMessages] = useState<Message[]>([]);
     const [isConnected, setIsConnected] = useState(false);
     const { user, profile } = useAuth();
-    const stream = useStreamState();
-    const currentStreamId = stream?.mux_playback_id;
+    const stream = useStreamState(streamId);
+    const currentStreamId = stream?.id;
 
     useEffect(() => {
         // 1. Cargar mensajes iniciales

@@ -9,6 +9,7 @@ import { useAuth } from './hooks/useAuth';
 import RequireRole from './components/RequireRole';
 import Foro from './pages/Foro';
 import PastorDashboard from './pages/PastorDashboard';
+import MyStreams from './pages/MyStreams';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
     const { user, loading } = useAuth();
@@ -28,9 +29,14 @@ function App() {
                         <Route path="/login" element={<Login />} />
                         <Route path="/register" element={<Navigate to="/login" replace />} />
                         <Route path="/invite/:codigo" element={<Invite />} />
-                        <Route path="/room" element={
+                        <Route path="/room/:streamId" element={
                             <ProtectedRoute>
                                 <Room />
+                            </ProtectedRoute>
+                        } />
+                        <Route path="/crear" element={
+                            <ProtectedRoute>
+                                <MyStreams />
                             </ProtectedRoute>
                         } />
                         <Route path="/foro" element={

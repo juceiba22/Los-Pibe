@@ -29,6 +29,11 @@ app.use(cors());
 // 1. CREATE STREAM API
 app.post('/api/create-stream', async (req, res) => {
   try {
+    const { userId, titulo, escenario_id } = req.body;
+    if (!userId) {
+      return res.status(400).json({ error: 'userId is required' });
+    }
+
     // call the Mux API to create a new live stream
     const stream = await mux.video.liveStreams.create({
       playback_policy: ['public'],
@@ -45,55 +50,59 @@ app.post('/api/create-stream', async (req, res) => {
     }
 
     // 2. SAVE STREAM INFO IN SUPABASE
-    // Update the `stream_estado` table (id = 1)
-    const { error } = await supabase
-      .from('stream_estado')
-      .update({
+    // Insert a new stream row in the `streams` table
+    const { data, error } = await supabase
+      .from('streams')
+      .insert([{
+        created_by: userId,
+        titulo: titulo || 'Transmisión Privada',
+        is_live: false,
         mux_stream_id: stream_id,
         mux_playback_id: playback_id,
         stream_key: stream_key,
-        is_live: false,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', 1);
+        escenario_id: escenario_id || 'estadio'
+      }])
+      .select()
+      .single();
 
     if (error) {
       throw new Error(`Supabase error: ${error.message}`);
     }
 
-    // Return the response as requested
-    res.json({
-      stream_id,
-      stream_key,
-      playback_id
-    });
+    // Return the full created stream row
+    res.json(data);
   } catch (err) {
     console.error('Error in /api/create-stream:', err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// 4. MUX WEBHOOK HANDLER
+// 2. MUX WEBHOOK HANDLER
 app.post('/api/mux-webhook', async (req, res) => {
   try {
     const event = req.body;
     console.log('Webhook received:', event.type);
+    const muxStreamId = event.data?.id;
+
+    if (!muxStreamId) {
+      return res.status(450).send('No stream id found in payload');
+    }
 
     if (event.type === 'video.live_stream.active') {
-      console.log('Stream is active! Updating DB...');
+      console.log(`Stream ${muxStreamId} is active! Updating DB...`);
       const { error } = await supabase
-        .from('stream_estado')
+        .from('streams')
         .update({ is_live: true, updated_at: new Date().toISOString() })
-        .eq('id', 1);
+        .eq('mux_stream_id', muxStreamId);
         
       if (error) console.error('Supabase update active error:', error);
     } 
     else if (event.type === 'video.live_stream.idle') {
-      console.log('Stream is idle! Updating DB...');
+      console.log(`Stream ${muxStreamId} is idle! Updating DB...`);
       const { error } = await supabase
-        .from('stream_estado')
+        .from('streams')
         .update({ is_live: false, updated_at: new Date().toISOString() })
-        .eq('id', 1);
+        .eq('mux_stream_id', muxStreamId);
         
       if (error) console.error('Supabase update idle error:', error);
     }
@@ -104,6 +113,42 @@ app.post('/api/mux-webhook', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// 3. GET ACTIVE STREAMS
+app.get('/api/streams/active', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('streams')
+      .select('*')
+      .eq('is_live', true)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    res.json(data);
+  } catch (err) {
+    console.error('Error in /api/streams/active:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 4. GET USER STREAMS
+app.get('/api/streams/user/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { data, error } = await supabase
+      .from('streams')
+      .select('*')
+      .eq('created_by', userId)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    res.json(data);
+  } catch (err) {
+    console.error('Error in /api/streams/user:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
 // --- TEMPORARY COMMUNITY FORUMS ENDPOINTS ---
 

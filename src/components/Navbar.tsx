@@ -24,8 +24,11 @@ export default function Navbar() {
                     {user ? (
                         <>
                             <span className="text-zinc-400 hidden sm:inline-block">Hola, <span className="text-white font-bold">{profile?.username || user.email}</span></span>
-                             <Link to="/room" className="px-3 py-1 bg-zinc-800/80 hover:bg-zinc-700/80 transition-colors rounded-full text-xs font-medium text-zinc-300 border border-zinc-700/50 backdrop-blur-sm shadow-sm hidden sm:block">
-                                 Transmisión
+                             <Link to="/" className="px-3 py-1 bg-zinc-800/80 hover:bg-zinc-700/80 transition-colors rounded-full text-xs font-medium text-zinc-300 border border-zinc-700/50 backdrop-blur-sm shadow-sm hidden sm:block">
+                                 Explorar
+                             </Link>
+                             <Link to="/crear" className="px-3 py-1 bg-zinc-800/80 hover:bg-zinc-700/80 transition-colors rounded-full text-xs font-medium text-zinc-300 border border-zinc-700/50 backdrop-blur-sm shadow-sm hidden sm:block">
+                                 Crear Vivo
                              </Link>
                              <Link to="/foro" className="px-3 py-1 bg-zinc-800/80 hover:bg-zinc-700/80 transition-colors rounded-full text-xs font-medium text-zinc-300 border border-zinc-700/50 backdrop-blur-sm shadow-sm flex items-center gap-2 group">
                                  <MessageSquare size={14} className="text-cyan-400" />

@@ -21,38 +21,38 @@ console.log("Mux event:", body.type)
 
     console.log("Mux webhook event:", body.type)
 
+    const muxStreamId = body.data?.id;
+    if (!muxStreamId) {
+      return new Response("No stream id found in payload", { status: 400 });
+    }
+
     // STREAM STARTED
     if (body.type === "video.live_stream.active") {
+      const playback_id = body.data.playback_ids?.[0]?.id;
 
-      const playback_id = body.data.playback_ids?.[0]?.id
+      await supabase
+        .from("streams")
+        .update({
+          is_live: true,
+          ...(playback_id ? { mux_playback_id: playback_id } : {}),
+          updated_at: new Date()
+        })
+        .eq("mux_stream_id", muxStreamId);
 
-      if (playback_id) {
-
-        await supabase
-          .from("stream_estado")
-          .update({
-            is_live: true,
-            mux_playback_id: playback_id,
-            updated_at: new Date()
-          })
-          .eq("id", 1)
-
-        console.log("Stream activo:", playback_id)
-      }
+      console.log("Stream activo:", muxStreamId);
     }
 
     // STREAM STOPPED
     if (body.type === "video.live_stream.idle") {
-
       await supabase
-        .from("stream_estado")
+        .from("streams")
         .update({
           is_live: false,
           updated_at: new Date()
         })
-        .eq("id", 1)
+        .eq("mux_stream_id", muxStreamId);
 
-      console.log("Stream finalizado")
+      console.log("Stream finalizado:", muxStreamId);
     }
 
     return new Response("ok", { status: 200 })

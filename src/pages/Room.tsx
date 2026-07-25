@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import VideoPlayer from '../components/VideoPlayer';
 import EnvironmentLayout from '../components/EnvironmentLayout';
@@ -8,12 +9,16 @@ import { useStreamState } from '../hooks/useStreamState';
 import { useAuth } from '../hooks/useAuth';
 
 export default function Room() {
-    const { messages, sendMessage, sendSticker, deleteMessage } = useChat();
-    const stream = useStreamState();
+    const { streamId } = useParams<{ streamId: string }>();
+    const { messages, sendMessage, sendSticker, deleteMessage } = useChat(streamId);
+    const stream = useStreamState(streamId);
     const { profile } = useAuth();
     const [viewers, setViewers] = useState(0);
+
     useEffect(() => {
-        const channel = supabase.channel(`stream_${stream.id}`, {
+        if (!streamId) return;
+
+        const channel = supabase.channel(`stream_${streamId}`, {
             config: {
                 presence: {
                     key: profile?.id || Math.random().toString()
@@ -38,7 +43,7 @@ export default function Room() {
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [stream.id]);
+    }, [streamId, profile]);
 
     // Check if the current user has moderation capabilities
     const isAdminOrMod = profile?.rol === 'conductor';
@@ -57,7 +62,7 @@ export default function Room() {
                 {/* Columna Video + Foro (Escenario Inmersivo) */}
                 <div className="lg:col-span-3 flex flex-col gap-4 z-10 overflow-y-auto custom-scrollbar pb-10">
 
-                    <EnvironmentLayout viewers={viewers}>
+                    <EnvironmentLayout viewers={viewers} streamId={streamId}>
                         <VideoPlayer
                             playbackId={stream.mux_playback_id}
                             isLive={stream.is_live}

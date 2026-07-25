@@ -6,6 +6,7 @@ import { STADIUM_PATTERNS, StadiumPattern } from '../config/stadiumPatterns';
 interface EnvironmentLayoutProps {
     children: React.ReactNode;
     viewers: number;
+    streamId?: string;
 }
 
 const playBeep = () => {
@@ -37,7 +38,7 @@ interface Particle {
     className: string;
 }
 
-export default function EnvironmentLayout({ children, viewers }: EnvironmentLayoutProps) {
+export default function EnvironmentLayout({ children, viewers, streamId }: EnvironmentLayoutProps) {
     // Environment State - Persistent via localStorage
     const [envId, setEnvId] = useState<string>(() => {
         return localStorage.getItem('room_environment') || 'estadio';
@@ -85,7 +86,7 @@ export default function EnvironmentLayout({ children, viewers }: EnvironmentLayo
         return {};
     };
 
-    const { counts, sendReaction } = useTribuna(1);
+    const { counts, sendReaction } = useTribuna(streamId);
     const [cooldownMsg, setCooldownMsg] = useState('');
     const [clickedReaction, setClickedReaction] = useState<TipoReaccion | null>(null);
     const [lastCounts, setLastCounts] = useState(counts);
