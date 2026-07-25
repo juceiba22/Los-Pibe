@@ -22,6 +22,7 @@ export default function MyStreams() {
     const [isCreating, setIsCreating] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [createdStream, setCreatedStream] = useState<StreamItem | null>(null);
+    const [showSuccessKey, setShowSuccessKey] = useState(false);
     
     const [userStreams, setUserStreams] = useState<StreamItem[]>([]);
     const [loadingStreams, setLoadingStreams] = useState(true);
@@ -62,8 +63,10 @@ export default function MyStreams() {
         setError(null);
         setCreatedStream(null);
 
+        const API_BASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001' : '';
+
         try {
-            const res = await fetch('/api/create-stream', {
+            const res = await fetch(`${API_BASE_URL}/api/create-stream`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -76,8 +79,8 @@ export default function MyStreams() {
             });
 
             if (!res.ok) {
-                const errData = await res.json();
-                throw new Error(errData.error || 'Error al crear la transmisión');
+                const text = await res.text();
+                throw new Error(`Error en el servidor (${res.status}): ${text}`);
             }
 
             const data = await res.json();
@@ -265,12 +268,21 @@ export default function MyStreams() {
                                     <label className="text-[10px] font-mono tracking-widest text-zinc-500 uppercase block">Clave de Transmisión (Stream Key)</label>
                                     <div className="flex gap-2">
                                         <input
-                                            type="text"
+                                            type={showSuccessKey ? "text" : "password"}
                                             readOnly
                                             value={createdStream.stream_key}
                                             className="flex-1 bg-zinc-950/60 border border-zinc-800/80 rounded-xl px-4 py-2.5 font-mono text-xs text-zinc-300 focus:outline-none"
                                         />
                                         <button
+                                            type="button"
+                                            onClick={() => setShowSuccessKey(!showSuccessKey)}
+                                            className="px-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-xl transition-colors border border-zinc-700/50 flex items-center justify-center"
+                                            title={showSuccessKey ? "Ocultar clave" : "Mostrar clave"}
+                                        >
+                                            {showSuccessKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                        </button>
+                                        <button
+                                            type="button"
                                             onClick={() => copyText(createdStream.stream_key, 'key')}
                                             className="px-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-xl transition-colors border border-zinc-700/50"
                                         >

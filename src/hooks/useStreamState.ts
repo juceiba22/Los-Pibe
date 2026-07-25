@@ -29,7 +29,7 @@ export function useStreamState(streamId?: string) {
                 .from('streams')
                 .select('*')
                 .eq('id', streamId)
-                .single();
+                .maybeSingle();
                 
             if (error) {
                 console.error('Error fetching stream state:', error);

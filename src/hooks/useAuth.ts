@@ -9,7 +9,18 @@ export function useAuth() {
 
     useEffect(() => {
         // Obtenemos la sesion actual
-        supabase.auth.getSession().then(({ data: { session } }) => {
+        supabase.auth.getSession().then(({ data: { session }, error }) => {
+            if (error) {
+                console.error('Error al obtener sesión:', error);
+                // Si el refresh token no es válido o la sesión expiró
+                if (error.name === 'AuthApiError' || error.status === 400 || error.status === 401) {
+                    supabase.auth.signOut().then(() => {
+                        window.location.href = '/login';
+                    });
+                    return;
+                }
+            }
+            
             setUser(session?.user ?? null);
             if (session?.user) {
                 fetchProfile(session.user.id);
@@ -54,12 +65,20 @@ export function useAuth() {
             .from('perfiles')
             .select('*')
             .eq('id', userId)
-            .single();
+            .maybeSingle();
         
+        if (error) {
+            console.error('Error fetching profile:', error);
+            // Si el token es inválido o no está autorizado
+            if (error.status === 401 || error.status === 403) {
+                await supabase.auth.signOut();
+                window.location.href = '/login';
+                return;
+            }
+        }
+
         if (data) {
             setProfile(data);
-        } else if (error) {
-            console.error('Error fetching profile:', error);
         }
         setLoading(false);
     };
