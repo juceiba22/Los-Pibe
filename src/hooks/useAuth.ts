@@ -13,7 +13,13 @@ export function useAuth() {
             if (error) {
                 console.error('Error al obtener sesión:', error);
                 // Si el refresh token no es válido o la sesión expiró
-                if (error.name === 'AuthApiError' || error.status === 400 || error.status === 401) {
+                if (
+                    error.name === 'AuthApiError' || 
+                    error.status === 400 || 
+                    error.status === 401 || 
+                    error.message?.includes('refresh_token_not_found') ||
+                    error.message?.includes('invalid_grant')
+                ) {
                     supabase.auth.signOut().then(() => {
                         window.location.href = '/login';
                     });
@@ -69,8 +75,8 @@ export function useAuth() {
         
         if (error) {
             console.error('Error fetching profile:', error);
-            // Si el token es inválido o no está autorizado
-            if (error.status === 401 || error.status === 403) {
+            // Si el token es inválido, expirado o no está autorizado
+            if (error.status === 400 || error.status === 401 || error.status === 403 || error.message?.includes('JWT')) {
                 await supabase.auth.signOut();
                 window.location.href = '/login';
                 return;

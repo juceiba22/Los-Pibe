@@ -106,29 +106,31 @@ export default function WebcamBroadcaster({ streamKey, streamId }: WebcamBroadca
             const offer = await pc.createOffer();
             await pc.setLocalDescription(offer);
 
-            // Clean stream key of spaces or special characters
-            const cleanStreamKey = streamKey.trim().replace(/\s+/g, '');
+            const API_BASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001' : '';
 
-            // Send local description to Mux WHIP Ingestion endpoint
-            const response = await fetch(`https://global.whip.mux.com/app/${cleanStreamKey}`, {
+            // Send local description to internal WHIP proxy endpoint (to avoid CORS)
+            const response = await fetch(`${API_BASE_URL}/api/whip`, {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/sdp'
+                    'Content-Type': 'application/json'
                 },
-                body: pc.localDescription?.sdp
+                body: JSON.stringify({
+                    streamKey: streamKey.trim(),
+                    sdp: offer.sdp
+                })
             });
 
             if (!response.ok) {
-                const sdpErrorText = await response.text();
-                throw new Error(`Error en el servidor WHIP de Mux (${response.status}): ${sdpErrorText}`);
+                const errText = await response.text();
+                throw new Error(`Error al conectar con Mux (${response.status}): ${errText}`);
             }
 
-            // Receive remote SDP answer from Mux
+            // Receive remote SDP answer from proxy
             const answerSdp = await response.text();
-            await pc.setRemoteDescription(new RTCSessionDescription({
+            await pc.setRemoteDescription({
                 type: 'answer',
                 sdp: answerSdp
-            }));
+            });
 
             // Force Supabase table 'is_live' to true for instant room update
             await supabase

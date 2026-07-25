@@ -77,6 +77,38 @@ app.post('/api/create-stream', async (req, res) => {
   }
 });
 
+// 1.5 WHIP PROXY API (to avoid CORS browser issues locally)
+app.post('/api/whip', async (req, res) => {
+  try {
+    const { streamKey, sdp } = req.body;
+    if (!streamKey || !sdp) {
+      return res.status(400).json({ error: 'streamKey y sdp son requeridos' });
+    }
+
+    const cleanStreamKey = streamKey.trim().replace(/\s+/g, '');
+
+    const response = await fetch(`https://global.whip.mux.com/app/${cleanStreamKey}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/sdp'
+      },
+      body: sdp
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      return res.status(response.status).send(errText);
+    }
+
+    const answerSdp = await response.text();
+    res.setHeader('Content-Type', 'text/plain');
+    res.send(answerSdp);
+  } catch (err) {
+    console.error('Error in /api/whip local proxy:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // 2. MUX WEBHOOK HANDLER
 app.post('/api/mux-webhook', async (req, res) => {
   try {
