@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import VideoPlayer from '../components/VideoPlayer';
-import TribunaReacciones from '../components/TribunaReacciones';
+import StadiumLayout from '../components/StadiumLayout';
 import Chat from '../components/Chat';
 import { useChat } from '../hooks/useChat';
 import { useStreamState } from '../hooks/useStreamState';
@@ -47,15 +47,6 @@ export default function Room() {
         sendMessage(text);
     };
 
-    const getTribunaNivel = (count: number) => {
-        if (count < 10) return "Núcleo Duro <10";
-        if (count < 20) return "OAA >10";
-        if (count < 30) return "La Banda Loca >20";
-        if (count < 40) return "La Barra Brava >30";
-        if (count < 50) return "Explotó el Estadio >40";
-        return "PICADÍSIMO >50";
-    };
-
     return (
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-[calc(100vh-8rem)] overflow-hidden">
 
@@ -63,17 +54,17 @@ export default function Room() {
                 <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-arg-celeste/10 rounded-full blur-[120px] pointer-events-none" />
                 <div className="absolute bottom-0 right-1/4 w-[600px] h-[600px] bg-arg-dorado/5 rounded-full blur-[150px] pointer-events-none" />
 
-                {/* Columna Video + Foro */}
+                {/* Columna Video + Foro (Estadio Digital) */}
                 <div className="lg:col-span-3 flex flex-col gap-4 z-10 overflow-y-auto custom-scrollbar pb-10">
 
-                    <VideoPlayer
-                        playbackId={stream.mux_playback_id}
-                        isLive={stream.is_live}
-                        title={stream.titulo}
-                        viewers={viewers}
-                    />
-
-                    <TribunaReacciones />
+                    <StadiumLayout viewers={viewers}>
+                        <VideoPlayer
+                            playbackId={stream.mux_playback_id}
+                            isLive={stream.is_live}
+                            title={stream.titulo}
+                            viewers={viewers}
+                        />
+                    </StadiumLayout>
 
                 </div>
 
@@ -90,4 +81,4 @@ export default function Room() {
 
             </div>
     );
-}
+}
