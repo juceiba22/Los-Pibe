@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTribuna, TipoReaccion } from '../hooks/useTribuna';
 import { STADIUM_THEMES, StadiumTheme } from './stadiumThemes';
+import { STADIUM_PATTERNS, StadiumPattern } from '../config/stadiumPatterns';
 
 interface StadiumLayoutProps {
     children: React.ReactNode;
@@ -43,13 +44,45 @@ export default function StadiumLayout({ children, viewers }: StadiumLayoutProps)
     });
     const [showThemeSelector, setShowThemeSelector] = useState(false);
 
-    // Get current theme object
+    // Seating Pattern State - Persistent via localStorage
+    const [patternId, setPatternId] = useState<string>(() => {
+        return localStorage.getItem('stadium_club_pattern') || 'neutral';
+    });
+    const [showPatternSelector, setShowPatternSelector] = useState(false);
+
+    // Get current theme & pattern objects
     const theme = STADIUM_THEMES.find(t => t.id === themeId) || STADIUM_THEMES[0];
+    const activePattern = STADIUM_PATTERNS.find(p => p.id === patternId) || STADIUM_PATTERNS[0];
 
     const changeTheme = (newId: string) => {
         setThemeId(newId);
         localStorage.setItem('stadium_theme', newId);
         setShowThemeSelector(false);
+    };
+
+    const changePattern = (newId: string) => {
+        setPatternId(newId);
+        localStorage.setItem('stadium_club_pattern', newId);
+        setShowPatternSelector(false);
+    };
+
+    // Helper to blend concrete steps texture with club colors
+    const getStandoBgStyle = (): React.CSSProperties => {
+        const backgrounds: string[] = [];
+        
+        // Seating row step horizontal lines on top
+        if (theme.stadiumTexture) {
+            backgrounds.push(theme.stadiumTexture);
+        }
+        // Vertical club color stripes at the bottom
+        if (activePattern.gradientString) {
+            backgrounds.push(activePattern.gradientString);
+        }
+        
+        if (backgrounds.length > 0) {
+            return { background: backgrounds.join(', ') };
+        }
+        return {};
     };
 
     const { counts, sendReaction } = useTribuna(1);
@@ -253,13 +286,16 @@ export default function StadiumLayout({ children, viewers }: StadiumLayoutProps)
 
             {/* TRIBUNA NORTE: Tablero LED superior */}
             <div 
-                className={`relative z-30 w-full border rounded-xl p-3 shadow-2xl flex items-center justify-between gap-4 transition-all duration-500 ${theme.norte.panelBg}`}
-                style={{ backgroundImage: theme.stadiumTexture }}
+                className={`relative z-35 w-full border rounded-xl p-3 shadow-2xl flex items-center justify-between gap-4 transition-all duration-500 ${theme.norte.panelBg}`}
+                style={getStandoBgStyle()}
             >
-                {/* Iluminación LED interna decorativa */}
-                <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent pointer-events-none rounded-xl" />
+                {/* CAPA 1: Filtro de contraste de Hinchada */}
+                <div className="absolute inset-0 bg-black/65 backdrop-blur-md rounded-xl z-0 pointer-events-none" />
+                {/* CAPA 2: Sombra interna para efecto de escalones/profundidad */}
+                <div className="absolute inset-0 shadow-[inset_0_0_15px_rgba(0,0,0,0.85)] rounded-xl z-10 pointer-events-none" />
 
-                <div className="flex items-center gap-3 z-10">
+                {/* Contenido (Capa 3: z-20) */}
+                <div className="flex items-center gap-3 relative z-20">
                     <div className="relative flex h-3 w-3">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
                         <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
@@ -275,7 +311,7 @@ export default function StadiumLayout({ children, viewers }: StadiumLayoutProps)
                 </div>
                 
                 {/* Scoreboard style reaction button for BANCO */}
-                <div className="flex items-center gap-2 z-10">
+                <div className="flex items-center gap-2 relative z-20">
                     <button
                         onClick={() => handleReaction('BANCO')}
                         className={`flex items-center gap-2 px-5 py-2.5 rounded-lg border transition-all duration-150 active:scale-95 shadow-lg group relative overflow-hidden font-bold text-sm tracking-wide ${theme.norte.bancoBtnClass} ${
@@ -292,79 +328,135 @@ export default function StadiumLayout({ children, viewers }: StadiumLayoutProps)
                     </button>
                 </div>
 
-                {/* SELECTOR DE ESTADIO (Dropdown flotante) */}
-                <div className="relative z-20">
-                    <button 
-                        onClick={() => setShowThemeSelector(!showThemeSelector)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono font-bold bg-zinc-950 hover:bg-zinc-900 border border-zinc-800 hover:border-zinc-700 text-zinc-300 rounded-lg transition-colors"
-                        title="Cambiar Estadio"
-                    >
-                        <span>🏟️</span>
-                        <span className="hidden md:inline">{theme.name}</span>
-                        <span className="text-[10px] text-zinc-500">▼</span>
-                    </button>
+                {/* SELECTORES FLOTANTES (Estadio & Club) */}
+                <div className="relative z-20 flex gap-2">
+                    {/* Selector de Hinchada (Club) */}
+                    <div className="relative">
+                        <button 
+                            onClick={() => {
+                                setShowPatternSelector(!showPatternSelector);
+                                setShowThemeSelector(false);
+                            }}
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono font-bold bg-zinc-950 hover:bg-zinc-900 border border-zinc-800 hover:border-zinc-700 text-zinc-300 rounded-lg transition-colors"
+                            title="Cambiar Hinchada"
+                        >
+                            <span>👕</span>
+                            <span className="hidden md:inline">{activePattern.name}</span>
+                            <span className="text-[10px] text-zinc-500">▼</span>
+                        </button>
 
-                    {showThemeSelector && (
-                        <>
-                            <div className="fixed inset-0 z-10" onClick={() => setShowThemeSelector(false)} />
-                            <div className="absolute right-0 mt-2 w-64 bg-zinc-950 border border-zinc-800 rounded-xl shadow-2xl z-20 overflow-hidden py-1 animate-fade-in">
-                                <div className="px-3 py-2 text-[10px] font-mono text-zinc-500 uppercase tracking-widest border-b border-zinc-900">
-                                    Seleccionar Estadio
+                        {showPatternSelector && (
+                            <>
+                                <div className="fixed inset-0 z-10" onClick={() => setShowPatternSelector(false)} />
+                                <div className="absolute right-0 mt-2 w-64 bg-zinc-950 border border-zinc-800 rounded-xl shadow-2xl z-20 overflow-hidden py-1 animate-fade-in">
+                                    <div className="px-3 py-2 text-[10px] font-mono text-zinc-500 uppercase tracking-widest border-b border-zinc-900">
+                                        Seleccionar Hinchada
+                                    </div>
+                                    {STADIUM_PATTERNS.map((sp) => (
+                                        <button
+                                            key={sp.id}
+                                            onClick={() => changePattern(sp.id)}
+                                            className={`w-full text-left px-3 py-2.5 hover:bg-zinc-900 flex flex-col gap-0.5 transition-colors ${
+                                                sp.id === patternId ? 'bg-zinc-900/60 border-l-2 border-emerald-500' : ''
+                                            }`}
+                                        >
+                                            <div className="text-xs font-bold text-white flex items-center justify-between">
+                                                <span>{sp.name}</span>
+                                                {sp.id === patternId && <span className="text-emerald-400 text-2xs">ACTIVO</span>}
+                                            </div>
+                                            <div className="text-[10px] text-zinc-400 font-sans leading-tight">
+                                                {sp.description}
+                                            </div>
+                                        </button>
+                                    ))}
                                 </div>
-                                {STADIUM_THEMES.map((st) => (
-                                    <button
-                                        key={st.id}
-                                        onClick={() => changeTheme(st.id)}
-                                        className={`w-full text-left px-3 py-2.5 hover:bg-zinc-900 flex flex-col gap-0.5 transition-colors ${
-                                            st.id === themeId ? 'bg-zinc-900/60 border-l-2 border-emerald-500' : ''
-                                        }`}
-                                    >
-                                        <div className="text-xs font-bold text-white flex items-center justify-between">
-                                            <span>{st.name}</span>
-                                            {st.id === themeId && <span className="text-emerald-400 text-2xs">ACTIVO</span>}
-                                        </div>
-                                        <div className="text-[10px] text-zinc-400 font-sans leading-tight">
-                                            {st.description}
-                                        </div>
-                                    </button>
-                                ))}
-                            </div>
-                        </>
-                    )}
+                            </>
+                        )}
+                    </div>
+
+                    {/* Selector de Estadio */}
+                    <div className="relative">
+                        <button 
+                            onClick={() => {
+                                setShowThemeSelector(!showThemeSelector);
+                                setShowPatternSelector(false);
+                            }}
+                            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono font-bold bg-zinc-950 hover:bg-zinc-900 border border-zinc-800 hover:border-zinc-700 text-zinc-300 rounded-lg transition-colors"
+                            title="Cambiar Estadio"
+                        >
+                            <span>🏟️</span>
+                            <span className="hidden md:inline">{theme.name}</span>
+                            <span className="text-[10px] text-zinc-500">▼</span>
+                        </button>
+
+                        {showThemeSelector && (
+                            <>
+                                <div className="fixed inset-0 z-10" onClick={() => setShowThemeSelector(false)} />
+                                <div className="absolute right-0 mt-2 w-64 bg-zinc-950 border border-zinc-800 rounded-xl shadow-2xl z-20 overflow-hidden py-1 animate-fade-in">
+                                    <div className="px-3 py-2 text-[10px] font-mono text-zinc-500 uppercase tracking-widest border-b border-zinc-900">
+                                        Seleccionar Estadio
+                                    </div>
+                                    {STADIUM_THEMES.map((st) => (
+                                        <button
+                                            key={st.id}
+                                            onClick={() => changeTheme(st.id)}
+                                            className={`w-full text-left px-3 py-2.5 hover:bg-zinc-900 flex flex-col gap-0.5 transition-colors ${
+                                                st.id === themeId ? 'bg-zinc-900/60 border-l-2 border-emerald-500' : ''
+                                            }`}
+                                        >
+                                            <div className="text-xs font-bold text-white flex items-center justify-between">
+                                                <span>{st.name}</span>
+                                                {st.id === themeId && <span className="text-emerald-400 text-2xs">ACTIVO</span>}
+                                            </div>
+                                            <div className="text-[10px] text-zinc-400 font-sans leading-tight">
+                                                {st.description}
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                            </>
+                        )}
+                    </div>
                 </div>
             </div>
 
             {/* FILA CENTRAL: Oeste (Stand Izquierdo), Cancha (Video), Este (Stand Derecho) */}
-            <div className="grid grid-cols-1 md:grid-cols-[80px_1fr_80px] gap-4 items-stretch w-full">
+            <div className="grid grid-cols-1 md:grid-cols-[80px_1fr_80px] gap-4 items-stretch w-full z-10">
                 
                 {/* TRIBUNA OESTE: Stand Lateral Izquierdo (Sólo Escritorio) */}
                 <div 
                     className={`hidden md:flex flex-col items-center justify-center border rounded-2xl p-2 select-none shadow-2xl relative overflow-hidden transition-all duration-500 ${theme.oeste.panelBg}`}
-                    style={{ backgroundImage: theme.stadiumTexture }}
+                    style={getStandoBgStyle()}
                 >
-                    <div className="absolute inset-x-0 top-0 h-8 bg-gradient-to-b from-white/5 to-transparent pointer-events-none" />
+                    {/* CAPA 1: Filtro de contraste de Hinchada */}
+                    <div className="absolute inset-0 bg-black/65 backdrop-blur-md rounded-2xl z-0 pointer-events-none" />
+                    {/* CAPA 2: Sombra interna para efecto de escalones/profundidad */}
+                    <div className="absolute inset-0 shadow-[inset_0_0_18px_rgba(0,0,0,0.85)] rounded-2xl z-10 pointer-events-none" />
                     
-                    <span className={`text-[10px] font-mono font-black tracking-widest vertical-text uppercase mb-6 ${theme.oeste.textColor}`}>
-                        TRIBUNA OESTE
-                    </span>
-                    
-                    <button
-                        onClick={() => handleReaction('AGUANTE')}
-                        className={`flex flex-col items-center gap-3 px-3 py-6 rounded-xl border transition-all duration-150 active:scale-95 shadow-2xl w-full group ${theme.oeste.aguanteBtnClass} ${
-                            clickedReaction === 'AGUANTE' ? 'scale-105 ring-2 ring-orange-500/20' : ''
-                        }`}
-                        title="Reaccionar AGUANTE (Fuego)"
-                    >
-                        <span className="text-3xl group-hover:animate-bounce transition-transform duration-200">🔥</span>
-                        <span className="text-[10px] font-black tracking-wider uppercase">
-                            AGUANTE
+                    {/* Contenido (Capa 3: z-20) */}
+                    <div className="relative z-20 flex flex-col items-center justify-center w-full h-full py-2">
+                        <span className={`text-[10px] font-mono font-black tracking-widest vertical-text uppercase mb-6 ${theme.oeste.textColor}`}>
+                            TRIBUNA OESTE
                         </span>
-                        <span className={`font-mono font-black text-xs px-2 py-0.5 rounded-full transition-transform duration-200 ${
-                            pulseStates.AGUANTE ? 'scale-130 bg-orange-500 text-white font-black' : 'bg-black/40 border border-orange-500/10'
-                        }`}>
-                            {counts.AGUANTE}
-                        </span>
-                    </button>
+                        
+                        <button
+                            onClick={() => handleReaction('AGUANTE')}
+                            className={`flex flex-col items-center gap-3 px-3 py-6 rounded-xl border transition-all duration-150 active:scale-95 shadow-2xl w-full group ${theme.oeste.aguanteBtnClass} ${
+                                clickedReaction === 'AGUANTE' ? 'scale-105 ring-2 ring-orange-500/20' : ''
+                            }`}
+                            title="Reaccionar AGUANTE (Fuego)"
+                        >
+                            <span className="text-3xl group-hover:animate-bounce transition-transform duration-200">🔥</span>
+                            <span className="text-[10px] font-black tracking-wider uppercase">
+                                AGUANTE
+                            </span>
+                            <span className={`font-mono font-black text-xs px-2 py-0.5 rounded-full transition-transform duration-200 ${
+                                pulseStates.AGUANTE ? 'scale-130 bg-orange-500 text-white font-black' : 'bg-black/40 border border-orange-500/10'
+                            }`}>
+                                {counts.AGUANTE}
+                            </span>
+                        </button>
+                    </div>
                 </div>
 
                 {/* LA CANCHA (CENTRO): Contenedor de Video con Brillo y Focos */}
@@ -405,31 +497,37 @@ export default function StadiumLayout({ children, viewers }: StadiumLayoutProps)
                 {/* TRIBUNA ESTE: Stand Lateral Derecho (Sólo Escritorio) */}
                 <div 
                     className={`hidden md:flex flex-col items-center justify-center border rounded-2xl p-2 select-none shadow-2xl relative overflow-hidden transition-all duration-500 ${theme.este.panelBg}`}
-                    style={{ backgroundImage: theme.stadiumTexture }}
+                    style={getStandoBgStyle()}
                 >
-                    <div className="absolute inset-x-0 top-0 h-8 bg-gradient-to-b from-white/5 to-transparent pointer-events-none" />
+                    {/* CAPA 1: Filtro de contraste de Hinchada */}
+                    <div className="absolute inset-0 bg-black/65 backdrop-blur-md rounded-2xl z-0 pointer-events-none" />
+                    {/* CAPA 2: Sombra interna para efecto de escalones/profundidad */}
+                    <div className="absolute inset-0 shadow-[inset_0_0_18px_rgba(0,0,0,0.85)] rounded-2xl z-10 pointer-events-none" />
                     
-                    <span className={`text-[10px] font-mono font-black tracking-widest vertical-text uppercase mb-6 ${theme.este.textColor}`}>
-                        TRIBUNA ESTE
-                    </span>
-                    
-                    <button
-                        onClick={() => handleReaction('JAJA')}
-                        className={`flex flex-col items-center gap-3 px-3 py-6 rounded-xl border transition-all duration-150 active:scale-95 shadow-2xl w-full group ${theme.este.jajaBtnClass} ${
-                            clickedReaction === 'JAJA' ? 'scale-105 ring-2 ring-yellow-500/20' : ''
-                        }`}
-                        title="Reaccionar JAJA (Risa)"
-                    >
-                        <span className="text-3xl group-hover:animate-bounce transition-transform duration-200">😂</span>
-                        <span className="text-[10px] font-black tracking-wider uppercase">
-                            JAJA
+                    {/* Contenido (Capa 3: z-20) */}
+                    <div className="relative z-20 flex flex-col items-center justify-center w-full h-full py-2">
+                        <span className={`text-[10px] font-mono font-black tracking-widest vertical-text uppercase mb-6 ${theme.este.textColor}`}>
+                            TRIBUNA ESTE
                         </span>
-                        <span className={`font-mono font-black text-xs px-2 py-0.5 rounded-full transition-transform duration-200 ${
-                            pulseStates.JAJA ? 'scale-130 bg-yellow-500 text-white font-black' : 'bg-black/40 border border-yellow-500/10'
-                        }`}>
-                            {counts.JAJA}
-                        </span>
-                    </button>
+                        
+                        <button
+                            onClick={() => handleReaction('JAJA')}
+                            className={`flex flex-col items-center gap-3 px-3 py-6 rounded-xl border transition-all duration-150 active:scale-95 shadow-2xl w-full group ${theme.este.jajaBtnClass} ${
+                                clickedReaction === 'JAJA' ? 'scale-105 ring-2 ring-yellow-500/20' : ''
+                            }`}
+                            title="Reaccionar JAJA (Risa)"
+                        >
+                            <span className="text-3xl group-hover:animate-bounce transition-transform duration-200">😂</span>
+                            <span className="text-[10px] font-black tracking-wider uppercase">
+                                JAJA
+                            </span>
+                            <span className={`font-mono font-black text-xs px-2 py-0.5 rounded-full transition-transform duration-200 ${
+                                pulseStates.JAJA ? 'scale-130 bg-yellow-500 text-white font-black' : 'bg-black/40 border border-yellow-500/10'
+                            }`}>
+                                {counts.JAJA}
+                            </span>
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -471,65 +569,70 @@ export default function StadiumLayout({ children, viewers }: StadiumLayoutProps)
             {/* TRIBUNA SUR: Panel de Estadísticas e Interacción y Publicidad LED */}
             <div 
                 className={`relative overflow-hidden w-full border rounded-xl p-4 shadow-2xl flex flex-col gap-3 transition-all duration-500 ${theme.sur.panelBg}`}
-                style={{ backgroundImage: theme.stadiumTexture }}
+                style={getStandoBgStyle()}
             >
-                <div className="absolute inset-x-0 top-0 h-8 bg-gradient-to-b from-white/5 to-transparent pointer-events-none" />
+                {/* CAPA 1: Filtro de contraste de Hinchada */}
+                <div className="absolute inset-0 bg-black/65 backdrop-blur-md rounded-xl z-0 pointer-events-none" />
+                {/* CAPA 2: Sombra interna para efecto de escalones/profundidad */}
+                <div className="absolute inset-0 shadow-[inset_0_0_18px_rgba(0,0,0,0.85)] rounded-xl z-10 pointer-events-none" />
 
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 z-10">
-                    
-                    {/* Hinchas en la Tribuna */}
-                    <div className="flex items-center gap-3">
-                        <div className={`flex items-center justify-center w-9 h-9 rounded-lg border font-bold text-lg shadow-inner ${theme.sur.statsBg}`}>
-                            👥
+                {/* Contenido (Capa 3: z-20) */}
+                <div className="relative z-20 flex flex-col gap-3 w-full">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                        {/* Hinchas en la Tribuna */}
+                        <div className="flex items-center gap-3">
+                            <div className={`flex items-center justify-center w-9 h-9 rounded-lg border font-bold text-lg shadow-inner ${theme.sur.statsBg}`}>
+                                👥
+                            </div>
+                            <div>
+                                <div className="text-[10px] text-zinc-500 font-mono font-black uppercase leading-none">Hinchas Registrados</div>
+                                <div className="text-sm font-black font-mono text-white flex items-center gap-1.5 mt-1">
+                                    {viewers}
+                                    <span className="text-[9px] font-bold text-emerald-400 bg-emerald-950/70 px-1.5 py-0.5 rounded border border-emerald-500/10 uppercase tracking-wider">
+                                        EN LA TRIBUNA
+                                    </span>
+                                </div>
+                            </div>
                         </div>
-                        <div>
-                            <div className="text-[10px] text-zinc-500 font-mono font-black uppercase leading-none">Hinchas Registrados</div>
-                            <div className="text-sm font-black font-mono text-white flex items-center gap-1.5 mt-1">
-                                {viewers}
-                                <span className="text-[9px] font-bold text-emerald-400 bg-emerald-950/70 px-1.5 py-0.5 rounded border border-emerald-500/10 uppercase tracking-wider">
-                                    EN LA TRIBUNA
-                                </span>
+
+                        {/* Vibe del Estadio / Nivel del Agite */}
+                        <div className="flex items-center gap-3">
+                            <div className={`flex items-center justify-center w-9 h-9 rounded-lg border font-bold text-lg shadow-inner ${theme.sur.statsBg}`}>
+                                🥁
+                            </div>
+                            <div>
+                                <div className="text-[10px] text-zinc-500 font-mono font-black uppercase leading-none">Nivel del Agite</div>
+                                <div className="text-sm font-black text-indigo-300 tracking-wide mt-1">
+                                    {getTribunaNivel(totalReactions)}
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    {/* Vibe del Estadio / Nivel del Agite */}
-                    <div className="flex items-center gap-3">
-                        <div className={`flex items-center justify-center w-9 h-9 rounded-lg border font-bold text-lg shadow-inner ${theme.sur.statsBg}`}>
-                            🥁
-                        </div>
-                        <div>
-                            <div className="text-[10px] text-zinc-500 font-mono font-black uppercase leading-none">Nivel del Agite</div>
-                            <div className="text-sm font-black text-indigo-300 tracking-wide mt-1">
-                                {getTribunaNivel(totalReactions)}
+                    {/* CARTELERA LED DE PUBLICIDAD (Marquee animado de fútbol) */}
+                    <div className="w-full bg-zinc-950/90 rounded-lg p-2 border border-zinc-900/60 overflow-hidden relative select-none shadow-inner">
+                        <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-zinc-950 to-transparent z-10 pointer-events-none" />
+                        <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-zinc-950 to-transparent z-10 pointer-events-none" />
+                        
+                        <div className="w-full overflow-hidden flex whitespace-nowrap">
+                            <div className={`animate-marquee text-[10px] font-mono tracking-widest uppercase py-0.5 flex gap-12 font-bold ${theme.marqueeTextColor}`}>
+                                <span>{ads[0]}</span>
+                                <span>{ads[1]}</span>
+                                <span>{ads[2]}</span>
+                                <span>{ads[3]}</span>
+                                <span>{ads[4]}</span>
+                                <span>{ads[5]}</span>
                             </div>
                         </div>
                     </div>
-                </div>
 
-                {/* CARTELERA LED DE PUBLICIDAD (Marquee animado de fútbol) */}
-                <div className="w-full bg-zinc-950/90 rounded-lg p-2 border border-zinc-900/60 overflow-hidden relative select-none z-10 shadow-inner">
-                    <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-zinc-950 to-transparent z-10 pointer-events-none" />
-                    <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-zinc-950 to-transparent z-10 pointer-events-none" />
-                    
-                    <div className="w-full overflow-hidden flex whitespace-nowrap">
-                        <div className={`animate-marquee text-[10px] font-mono tracking-widest uppercase py-0.5 flex gap-12 font-bold ${theme.marqueeTextColor}`}>
-                            <span>{ads[0]}</span>
-                            <span>{ads[1]}</span>
-                            <span>{ads[2]}</span>
-                            <span>{ads[3]}</span>
-                            <span>{ads[4]}</span>
-                            <span>{ads[5]}</span>
+                    {/* Mensajes de cooldown / errores de interacción */}
+                    {cooldownMsg && (
+                        <div className="text-center text-xs font-semibold text-red-400 bg-red-950/30 border border-red-500/20 py-2.5 rounded-lg animate-pulse">
+                            ⚠️ {cooldownMsg}
                         </div>
-                    </div>
+                    )}
                 </div>
-
-                {/* Mensajes de cooldown / errores de interacción */}
-                {cooldownMsg && (
-                    <div className="text-center text-xs font-semibold text-red-400 bg-red-950/30 border border-red-500/20 py-2.5 rounded-lg animate-pulse z-10">
-                        ⚠️ {cooldownMsg}
-                    </div>
-                )}
             </div>
         </div>
     );
