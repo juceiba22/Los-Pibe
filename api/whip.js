@@ -5,21 +5,36 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
-
+  
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    const { streamKey, sdp } = req.body;
+    // Parse body defensively in case it comes as a string or object
+    let body = req.body;
+    if (typeof body === 'string') {
+      try { 
+        body = JSON.parse(body); 
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    const streamKey = body?.streamKey?.trim();
+    const sdp = body?.sdp;
+
     if (!streamKey || !sdp) {
+      console.error('Faltan parámetros en /api/whip:', { hasStreamKey: !!streamKey, hasSdp: !!sdp });
       return res.status(400).json({ error: 'streamKey y sdp son requeridos' });
     }
 
-    const cleanStreamKey = streamKey.trim().replace(/\s+/g, '');
+    const cleanStreamKey = streamKey.replace(/\s+/g, '');
+    const muxWhipUrl = `https://global.whip.mux.com/app/${cleanStreamKey}`;
+    console.log(`Iniciando conexión WHIP a Mux con streamKey: ${cleanStreamKey.substring(0, 6)}...`);
 
-    // Server-to-server POST to Mux WHIP endpoint bypassing browser CORS
-    const response = await fetch(`https://global.whip.mux.com/app/${cleanStreamKey}`, {
+    // Server-to-server POST to Mux WHIP endpoint bypassing CORS
+    const muxResponse = await fetch(muxWhipUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/sdp'
@@ -27,16 +42,18 @@ export default async function handler(req, res) {
       body: sdp
     });
 
-    if (!response.ok) {
-      const errText = await response.text();
-      return res.status(response.status).send(errText);
+    if (!muxResponse.ok) {
+      const errText = await muxResponse.text();
+      console.error(`Mux WHIP rechazó la oferta (${muxResponse.status}):`, errText);
+      return res.status(muxResponse.status).send(errText || 'Error en servidor WHIP Mux');
     }
 
-    const answerSdp = await response.text();
-    res.setHeader('Content-Type', 'text/plain');
-    return res.status(200).send(answerSdp);
+    const answerSdp = await muxResponse.text();
+    return res.status(201).send(answerSdp);
+
   } catch (err) {
-    console.error('Error in /api/whip proxy serverless function:', err);
-    return res.status(500).json({ error: err.message });
+    console.error('Error detallado en /api/whip:', err, err.cause);
+    const detail = err.cause ? `${err.message} (${err.cause})` : err.message;
+    return res.status(500).json({ error: detail });
   }
 }

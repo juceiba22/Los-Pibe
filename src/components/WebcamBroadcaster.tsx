@@ -122,7 +122,7 @@ export default function WebcamBroadcaster({ streamKey, streamId }: WebcamBroadca
 
             if (!response.ok) {
                 const errText = await response.text();
-                throw new Error(`Error al conectar con Mux (${response.status}): ${errText}`);
+                throw new Error(`Error al conectar (${response.status}): ${errText}`);
             }
 
             // Receive remote SDP answer from proxy

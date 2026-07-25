@@ -80,14 +80,28 @@ app.post('/api/create-stream', async (req, res) => {
 // 1.5 WHIP PROXY API (to avoid CORS browser issues locally)
 app.post('/api/whip', async (req, res) => {
   try {
-    const { streamKey, sdp } = req.body;
+    let body = req.body;
+    if (typeof body === 'string') {
+      try { 
+        body = JSON.parse(body); 
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    const streamKey = body?.streamKey?.trim();
+    const sdp = body?.sdp;
+
     if (!streamKey || !sdp) {
+      console.error('Faltan parámetros en /api/whip:', { hasStreamKey: !!streamKey, hasSdp: !!sdp });
       return res.status(400).json({ error: 'streamKey y sdp son requeridos' });
     }
 
-    const cleanStreamKey = streamKey.trim().replace(/\s+/g, '');
+    const cleanStreamKey = streamKey.replace(/\s+/g, '');
+    const muxWhipUrl = `https://global.whip.mux.com/app/${cleanStreamKey}`;
+    console.log(`Iniciando conexión WHIP local a Mux con streamKey: ${cleanStreamKey.substring(0, 6)}...`);
 
-    const response = await fetch(`https://global.whip.mux.com/app/${cleanStreamKey}`, {
+    const response = await fetch(muxWhipUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/sdp'
@@ -97,15 +111,17 @@ app.post('/api/whip', async (req, res) => {
 
     if (!response.ok) {
       const errText = await response.text();
-      return res.status(response.status).send(errText);
+      console.error(`Mux WHIP local rechazó la oferta (${response.status}):`, errText);
+      return res.status(response.status).send(errText || 'Error en servidor WHIP Mux');
     }
 
     const answerSdp = await response.text();
     res.setHeader('Content-Type', 'text/plain');
-    res.send(answerSdp);
+    res.status(201).send(answerSdp);
   } catch (err) {
-    console.error('Error in /api/whip local proxy:', err);
-    res.status(500).json({ error: err.message });
+    console.error('Error detallado en /api/whip local:', err, err.cause);
+    const detail = err.cause ? `${err.message} (${err.cause})` : err.message;
+    res.status(500).json({ error: detail });
   }
 });
 
