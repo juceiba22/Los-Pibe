@@ -1,5 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 
+// Defensivo logging for Vercel logs verification
+console.log('VITE_SUPABASE_URL presente:', !!process.env.VITE_SUPABASE_URL);
+console.log('SUPABASE_SERVICE_ROLE_KEY presente:', !!process.env.SUPABASE_SERVICE_ROLE_KEY);
+
 const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
@@ -7,7 +11,21 @@ if (!supabaseUrl || !supabaseServiceKey) {
   console.warn('Warning: VITE_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY environment variables are missing.');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseServiceKey);
+// Lazy initialization using a Proxy to prevent crashes on module import time
+let supabaseInstance = null;
+export const supabase = new Proxy({}, {
+  get(target, prop) {
+    if (!supabaseInstance) {
+      const url = process.env.VITE_SUPABASE_URL || '';
+      const key = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+      if (!url || !key) {
+        throw new Error('Supabase URL or Service Role Key is missing in environment variables.');
+      }
+      supabaseInstance = createClient(url, key);
+    }
+    return supabaseInstance[prop];
+  }
+});
 
 export function setCorsHeaders(res) {
   res.setHeader('Access-Control-Allow-Credentials', true);
