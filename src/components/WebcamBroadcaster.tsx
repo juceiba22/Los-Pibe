@@ -89,15 +89,11 @@ export default function WebcamBroadcaster({ streamKey, streamId }: WebcamBroadca
             });
             peerConnectionRef.current = pc;
 
-            // Handle connection state changes
+            // Handle connection state changes after connected
             pc.onconnectionstatechange = () => {
                 console.log('WebRTC Connection State:', pc.connectionState);
-                if (pc.connectionState === 'connected') {
-                    setIsStreaming(true);
-                    setIsConnecting(false);
-                    setStatusMessage('Transmitiendo en Vivo 🔴');
-                } else if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
-                    handleStreamFailure('Conexión WebRTC interrumpida');
+                if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
+                    handleStreamFailure('Conexión WebRTC interrumpida con Mux');
                 }
             };
 
@@ -110,8 +106,11 @@ export default function WebcamBroadcaster({ streamKey, streamId }: WebcamBroadca
             const offer = await pc.createOffer();
             await pc.setLocalDescription(offer);
 
+            // Clean stream key of spaces or special characters
+            const cleanStreamKey = streamKey.trim().replace(/\s+/g, '');
+
             // Send local description to Mux WHIP Ingestion endpoint
-            const response = await fetch(`https://stream.mux.com/whip/${streamKey}`, {
+            const response = await fetch(`https://global.whip.mux.com/app/${cleanStreamKey}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/sdp'
@@ -136,6 +135,11 @@ export default function WebcamBroadcaster({ streamKey, streamId }: WebcamBroadca
                 .from('streams')
                 .update({ is_live: true, updated_at: new Date().toISOString() })
                 .eq('id', streamId);
+
+            // Set state as streaming active immediately after successful SDP exchange
+            setIsStreaming(true);
+            setIsConnecting(false);
+            setStatusMessage('Transmitiendo en Vivo 🔴');
 
         } catch (err: any) {
             console.error('WHIP Connection failed:', err);
@@ -196,6 +200,9 @@ export default function WebcamBroadcaster({ streamKey, streamId }: WebcamBroadca
         };
     }, [isStreaming, streamId]);
 
+    // Check if permission was denied (localStream is null AND error is set)
+    const isPermissionError = !localStream && error;
+
     return (
         <div className="space-y-4 font-sans">
             {/* Visual Screen Container */}
@@ -221,7 +228,7 @@ export default function WebcamBroadcaster({ streamKey, streamId }: WebcamBroadca
                     <div className={`text-[10px] px-2.5 py-1 rounded-full font-bold uppercase tracking-wider shadow-lg flex items-center gap-1.5 ${
                         statusMessage === 'Cámara Lista' ? 'bg-emerald-500/90 text-zinc-950 border border-emerald-400/25' :
                         statusMessage === 'Transmitiendo en Vivo 🔴' ? 'bg-red-950/80 text-red-400 border border-red-500/25' :
-                        statusMessage === 'Error de Permisos' ? 'bg-red-500/90 text-zinc-950' :
+                        statusMessage === 'Error de Permisos' || isPermissionError ? 'bg-red-500/90 text-zinc-950' :
                         'bg-zinc-800/90 text-zinc-300'
                     }`}>
                         {statusMessage === 'Cámara Lista' && <ShieldCheck size={12} />}
@@ -232,7 +239,7 @@ export default function WebcamBroadcaster({ streamKey, streamId }: WebcamBroadca
                 </div>
 
                 {/* Quick Toggle Controls Overlay (Only visible if camera is ready) */}
-                {localStream && !error && (
+                {localStream && !isPermissionError && (
                     <div className="absolute bottom-4 right-4 z-20 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                         <button
                             type="button"
@@ -246,8 +253,8 @@ export default function WebcamBroadcaster({ streamKey, streamId }: WebcamBroadca
                     </div>
                 )}
 
-                {/* Video Off Placeholder */}
-                {(!localStream || error) && (
+                {/* Video Off Placeholder (Only if camera is not initialized) */}
+                {!localStream && (
                     <div className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-950 text-zinc-500 space-y-3 p-6 text-center">
                         <VideoOff size={36} className="text-zinc-650" />
                         {error ? (
@@ -260,37 +267,53 @@ export default function WebcamBroadcaster({ streamKey, streamId }: WebcamBroadca
             </div>
 
             {/* Controls Button Area */}
-            {localStream && !error && (
-                <div className="flex gap-4">
-                    {!isStreaming ? (
-                        <button
-                            type="button"
-                            onClick={startStreaming}
-                            disabled={isConnecting}
-                            className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-red-500 hover:bg-red-600 text-white font-bold transition-all shadow-md active:scale-95 disabled:opacity-50 text-sm"
-                        >
-                            {isConnecting ? (
-                                <>
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                    Conectando Mux...
-                                </>
-                            ) : (
-                                <>
-                                    <Play size={16} fill="currentColor" />
-                                    Iniciar Transmisión en Vivo
-                                </>
-                            )}
-                        </button>
-                    ) : (
-                        <button
-                            type="button"
-                            onClick={stopStreaming}
-                            className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 hover:text-white font-bold transition-all shadow-md active:scale-95 text-sm border border-zinc-700/50"
-                        >
-                            <Square size={16} fill="currentColor" />
-                            Detener Transmisión
-                        </button>
+            {localStream && (
+                <div className="flex flex-col gap-3">
+                    {/* Error Box for WebRTC/SDP exchange errors (doesn't block video preview) */}
+                    {error && (
+                        <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-3 text-sm animate-in slide-in-from-top-2 duration-200">
+                            <span className="text-red-400 font-medium text-xs leading-normal">{error}</span>
+                            <button
+                                type="button"
+                                onClick={startStreaming}
+                                className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg font-bold text-xs transition-colors shrink-0 active:scale-95 shadow"
+                            >
+                                Reintentar conexión
+                            </button>
+                        </div>
                     )}
+
+                    <div className="flex gap-4">
+                        {!isStreaming ? (
+                            <button
+                                type="button"
+                                onClick={startStreaming}
+                                disabled={isConnecting}
+                                className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-red-500 hover:bg-red-600 text-white font-bold transition-all shadow-md active:scale-95 disabled:opacity-50 text-sm"
+                            >
+                                {isConnecting ? (
+                                    <>
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                        Conectando Mux...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Play size={16} fill="currentColor" />
+                                        Iniciar Transmisión en Vivo
+                                    </>
+                                )}
+                            </button>
+                        ) : (
+                            <button
+                                type="button"
+                                onClick={stopStreaming}
+                                className="flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 hover:text-white font-bold transition-all shadow-md active:scale-95 text-sm border border-zinc-700/50"
+                            >
+                                <Square size={16} fill="currentColor" />
+                                Detener Transmisión
+                            </button>
+                        )}
+                    </div>
                 </div>
             )}
         </div>
