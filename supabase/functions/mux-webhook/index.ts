@@ -8,59 +8,57 @@ serve(async (req) => {
   }
 
   try {
-
     const body = await req.json()
   
-console.log("MUX FULL PAYLOAD:", JSON.stringify(body, null, 2))
-console.log("Mux event:", body.type)
+    console.log("MUX FULL PAYLOAD:", JSON.stringify(body, null, 2))
+    console.log("Mux event:", body.type)
 
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     )
 
-    console.log("Mux webhook event:", body.type)
+    const muxStreamId = body.data?.id
+    const playbackId = body.data?.playback_ids?.[0]?.id
 
-    const muxStreamId = body.data?.id;
+    console.log(`Edge function Mux webhook - Stream ID: ${muxStreamId}, Playback ID: ${playbackId}`);
+
     if (!muxStreamId) {
-      return new Response("No stream id found in payload", { status: 400 });
+      return new Response("No stream id found in payload", { status: 400 })
     }
 
-    // STREAM STARTED
-    if (body.type === "video.live_stream.active") {
-      const playback_id = body.data.playback_ids?.[0]?.id;
+    const isLive = body.type === "video.live_stream.active"
 
-      await supabase
+    if (body.type === "video.live_stream.active" || body.type === "video.live_stream.idle") {
+      console.log(`Stream ${muxStreamId} status change: is_live = ${isLive}`);
+
+      let updateQuery = supabase
         .from("streams")
         .update({
-          is_live: true,
-          ...(playback_id ? { mux_playback_id: playback_id } : {}),
+          is_live: isLive,
+          ...(isLive && playbackId ? { mux_playback_id: playbackId } : {}),
           updated_at: new Date()
         })
-        .eq("mux_stream_id", muxStreamId);
 
-      console.log("Stream activo:", muxStreamId);
-    }
+      if (playbackId) {
+        updateQuery = updateQuery.or(`mux_stream_id.eq.${muxStreamId},mux_playback_id.eq.${playbackId}`)
+      } else {
+        updateQuery = updateQuery.eq("mux_stream_id", muxStreamId)
+      }
 
-    // STREAM STOPPED
-    if (body.type === "video.live_stream.idle") {
-      await supabase
-        .from("streams")
-        .update({
-          is_live: false,
-          updated_at: new Date()
-        })
-        .eq("mux_stream_id", muxStreamId);
-
-      console.log("Stream finalizado:", muxStreamId);
+      const { error } = await updateQuery
+      
+      if (error) {
+        console.error("Supabase edge update error:", error)
+      } else {
+        console.log("Supabase edge update successful")
+      }
     }
 
     return new Response("ok", { status: 200 })
 
   } catch (err) {
-
     console.error(err)
-
     return new Response("error", { status: 500 })
   }
 })

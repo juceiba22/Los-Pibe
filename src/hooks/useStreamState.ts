@@ -54,16 +54,18 @@ export function useStreamState(streamId?: string) {
         const channel = supabase.channel(`stream_updates_${streamId}`)
             .on(
                 'postgres_changes',
-                { event: 'UPDATE', schema: 'public', table: 'streams', filter: `id=eq.${streamId}` },
+                { event: '*', schema: 'public', table: 'streams', filter: `id=eq.${streamId}` },
                 (payload: any) => {
-                    setStream({
-                        id: payload.new.id,
-                        titulo: payload.new.titulo,
-                        is_live: payload.new.is_live,
-                        mux_playback_id: payload.new.mux_playback_id,
-                        escenario_id: payload.new.escenario_id,
-                        created_by: payload.new.created_by
-                    });
+                    if (payload.new) {
+                        setStream({
+                            id: payload.new.id,
+                            titulo: payload.new.titulo,
+                            is_live: payload.new.is_live,
+                            mux_playback_id: payload.new.mux_playback_id,
+                            escenario_id: payload.new.escenario_id,
+                            created_by: payload.new.created_by
+                        });
+                    }
                 }
             )
             .subscribe();

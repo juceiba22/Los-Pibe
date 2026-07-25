@@ -96,6 +96,23 @@ export default function MyStreams() {
         }
     };
 
+    const handleToggleLiveManual = async (streamId: string, currentLive: boolean) => {
+        const { error } = await supabase
+            .from('streams')
+            .update({ is_live: !currentLive, updated_at: new Date().toISOString() })
+            .eq('id', streamId);
+
+        if (error) {
+            alert('Error al actualizar la señal: ' + error.message);
+        } else {
+            // Update createdStream in state if it's the active one
+            if (createdStream?.id === streamId) {
+                setCreatedStream(prev => prev ? { ...prev, is_live: !currentLive } : null);
+            }
+            fetchUserStreams();
+        }
+    };
+
     const handleDeleteStream = async (id: string) => {
         if (!window.confirm('¿Estás seguro de que querés eliminar esta transmisión? Se perderán permanentemente el historial de chat y reacciones.')) return;
 
@@ -332,6 +349,17 @@ export default function MyStreams() {
                                                             Inactivo
                                                         </span>
                                                     )}
+                                                    <button
+                                                        onClick={() => handleToggleLiveManual(st.id, st.is_live)}
+                                                        className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider border transition-colors duration-150 ${
+                                                            st.is_live
+                                                                ? 'bg-red-500/10 hover:bg-zinc-800 text-red-400 hover:text-zinc-400 border-red-500/20 hover:border-zinc-700'
+                                                                : 'bg-zinc-850 hover:bg-emerald-500/10 text-zinc-400 hover:text-emerald-400 border-zinc-700/50 hover:border-emerald-500/20'
+                                                        }`}
+                                                        title={st.is_live ? "Detener señal manual en Supabase" : "Iniciar señal manual en Supabase"}
+                                                    >
+                                                        {st.is_live ? 'Detener (manual)' : 'Iniciar (manual)'}
+                                                    </button>
                                                     <span className="text-[10px] text-zinc-550">{new Date(st.created_at).toLocaleDateString()}</span>
                                                 </div>
                                             </div>
