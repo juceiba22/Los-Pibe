@@ -40,8 +40,7 @@ rtsp: yes
 rtspAddress: :8554
 # Only allow TCP internally (no need for UDP RTSP on Fly)
 protocols: [tcp]
-# Disable encrypted RTSP — not needed internally
-rtsps: no
+
 
 ###############################################
 # Disable unused protocols to reduce attack surface
@@ -56,22 +55,14 @@ srt: no
 ###############################################
 
 webrtc: yes
-# HTTP listener port — Fly.io proxy will handle HTTPS externally
-# and forward to this internal port
 webrtcAddress: :8889
 webrtcEncryption: no
-# Open CORS so the mobile browser can publish WHIP directly
-webrtcAllowOrigin: '*'
-# Public STUN servers for ICE candidate gathering on the browser side
+webrtcAllowOrigins: ["*"]
 webrtcICEServers2:
   - url: stun:stun.l.google.com:19302
   - url: stun:stun1.l.google.com:19302
-# Single UDP port mux for ICE — required for Fly.io networking
-# Fly exposes this as a UDP service (see fly.toml)
-webrtcICEUDPMuxAddress: :9000
-# NAT 1:1 mapping — REPLACE with the actual IPv4 from `fly ips allocate-v4`
-# This is the most critical setting for ICE to work behind Fly's NAT
-webrtcICEHostNAT1To1IPs: ['137.66.49.215']
+webrtcLocalUDPAddress: :9000
+webrtcAdditionalHosts: ['137.66.49.215']
 
 ###############################################
 # Paths — catch-all with runOnReady hook
