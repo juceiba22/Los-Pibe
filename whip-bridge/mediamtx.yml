@@ -71,7 +71,7 @@ webrtcICEServers2:
 webrtcICEUDPMuxAddress: :9000
 # NAT 1:1 mapping — REPLACE with the actual IPv4 from `fly ips allocate-v4`
 # This is the most critical setting for ICE to work behind Fly's NAT
-webrtcICEHostNAT1To1IPs: ['YOUR_FLY_PUBLIC_IPV4']
+webrtcICEHostNAT1To1IPs: ['137.66.49.215']
 
 ###############################################
 # Paths — catch-all with runOnReady hook

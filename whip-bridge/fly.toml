@@ -1,52 +1,41 @@
-# fly.toml — Fly.io configuration for the WHIP→RTMP bridge
-# App name: los-pibe-whip
-# Run `fly launch --no-deploy` from whip-bridge/ to generate the app,
-# then `fly deploy` to build and ship the container.
+# fly.toml app configuration file generated for los-pibe-whip on 2026-07-29T16:36:02-03:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
 
-app = "los-pibe-whip"
-primary_region = "gru"   # São Paulo — closest to Argentina; change if needed
+app = 'los-pibe-whip'
+primary_region = 'gru'
 
 [build]
-  dockerfile = "Dockerfile"
+  dockerfile = 'Dockerfile'
 
-###############################################
-# HTTP service — WHIP signalling (SDP exchange)
-# Fly terminates TLS and proxies to internal port 8889
-###############################################
 [[services]]
+  protocol = 'tcp'
   internal_port = 8889
-  protocol = "tcp"
 
   [[services.ports]]
     port = 80
-    handlers = ["http"]
+    handlers = ['http']
     force_https = true
 
   [[services.ports]]
     port = 443
-    handlers = ["tls", "http"]
+    handlers = ['tls', 'http']
 
   [services.concurrency]
-    type = "connections"
+    type = 'connections'
     hard_limit = 50
     soft_limit = 30
 
-###############################################
-# UDP service — WebRTC ICE media transport
-# Fly exposes a single UDP port for ICE mux
-# This must match webrtcICEUDPMuxAddress in mediamtx.yml
-###############################################
 [[services]]
+  protocol = 'udp'
   internal_port = 9000
-  protocol = "udp"
 
   [[services.ports]]
     port = 9000
 
-###############################################
-# Resources
-###############################################
-[vm]
-  memory = "512mb"
-  cpu_kind = "shared"
+[[vm]]
+  memory = '512mb'
+  cpu_kind = 'shared'
   cpus = 1
+  memory_mb = 512
