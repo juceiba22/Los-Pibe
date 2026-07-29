@@ -74,26 +74,38 @@ export default function WebcamBroadcaster({ streamKey, streamId }: WebcamBroadca
         };
     }, [facingMode]);
 
-    // 2. WHIP Connection Logic (WebRTC stream ingestion)
+    // 2. WHIP Connection Logic (WebRTC stream ingestion via bridge on Fly.io)
+    // The browser publishes WHIP directly to the MediaMTX bridge.
+    // MediaMTX receives the WebRTC stream and re-publishes it via RTMP to Mux.
+    // Bridge URL is set in VITE_WHIP_BRIDGE_URL (e.g. https://los-pibe-whip.fly.dev)
     const startStreaming = async () => {
         if (!localStream || !streamKey) return;
+
+        const bridgeUrl = import.meta.env.VITE_WHIP_BRIDGE_URL;
+        if (!bridgeUrl) {
+            setError('VITE_WHIP_BRIDGE_URL no está configurada. Revisá las variables de entorno.');
+            return;
+        }
         
         setIsConnecting(true);
         setStatusMessage('Conectando señal...');
         setError(null);
 
         try {
-            // WHIP connection setup
+            // WHIP connection setup — ICE servers on the browser side
             const pc = new RTCPeerConnection({
-                iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+                iceServers: [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' }
+                ]
             });
             peerConnectionRef.current = pc;
 
-            // Handle connection state changes after connected
+            // Monitor connection state — fire failure handler if ICE drops
             pc.onconnectionstatechange = () => {
                 console.log('WebRTC Connection State:', pc.connectionState);
                 if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
-                    handleStreamFailure('Conexión WebRTC interrumpida con Mux');
+                    handleStreamFailure('Conexión WebRTC con el bridge interrumpida');
                 }
             };
 
@@ -106,26 +118,27 @@ export default function WebcamBroadcaster({ streamKey, streamId }: WebcamBroadca
             const offer = await pc.createOffer();
             await pc.setLocalDescription(offer);
 
-            const API_BASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001' : '';
+            // WHIP publish: POST SDP offer directly to the bridge
+            // URL format: https://bridge.fly.dev/{stream_key}/whip
+            // This is the standard WHIP protocol endpoint format.
+            const cleanKey = streamKey.trim();
+            const whipUrl = `${bridgeUrl}/${cleanKey}/whip`;
+            console.log(`Publicando WHIP a bridge: ${whipUrl.replace(cleanKey, cleanKey.substring(0, 6) + '...')}`);
 
-            // Send local description to internal WHIP proxy endpoint (to avoid CORS)
-            const response = await fetch(`${API_BASE_URL}/api/whip`, {
+            const response = await fetch(whipUrl, {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/sdp'
                 },
-                body: JSON.stringify({
-                    streamKey: streamKey.trim(),
-                    sdp: offer.sdp
-                })
+                body: offer.sdp
             });
 
             if (!response.ok) {
                 const errText = await response.text();
-                throw new Error(`Error al conectar (${response.status}): ${errText}`);
+                throw new Error(`Error al conectar con el bridge (${response.status}): ${errText}`);
             }
 
-            // Receive remote SDP answer from proxy
+            // MediaMTX responds with 201 + SDP answer in plain text
             const answerSdp = await response.text();
             await pc.setRemoteDescription({
                 type: 'answer',

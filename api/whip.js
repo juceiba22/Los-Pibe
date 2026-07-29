@@ -1,3 +1,22 @@
+/**
+ * DEPRECADO — ya no se usa desde ningún componente del frontend.
+ *
+ * MOTIVO: Mux no ofrece ingesta WHIP/WebRTC nativa para Live Streams
+ * estándar. El hostname global.whip.mux.com no existe: cualquier intento
+ * de negociar SDP contra él falla con ENOTFOUND.
+ *
+ * SOLUCIÓN ACTUAL: La ingesta desde celular/navegador ahora pasa por el
+ * bridge propio desplegado en Fly.io (whip-bridge/). El componente
+ * WebcamBroadcaster.tsx publica WHIP directo al bridge:
+ *
+ *   POST https://los-pibe-whip.fly.dev/{stream_key}/whip
+ *
+ * El bridge (MediaMTX) re-publica el stream por RTMP hacia Mux.
+ * Ver whip-bridge/README.md para instrucciones de despliegue.
+ *
+ * Este archivo se mantiene para no romper imports, pero no se invoca
+ * desde ningún lado. Puede borrarse en una limpieza futura.
+ */
 import { setCorsHeaders } from './_utils.js';
 
 export default async function handler(req, res) {

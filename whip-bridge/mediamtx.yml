@@ -1,0 +1,97 @@
+###############################################
+# MediaMTX configuration for WHIP→RTMP bridge
+# Deployed on Fly.io for "Los Pibe" app
+# Key names verified against mediamtx.yml main branch, July 2026
+###############################################
+
+###############################################
+# Global settings
+###############################################
+
+logLevel: info
+logDestinations: [stdout]
+
+readTimeout: 10s
+writeTimeout: 10s
+writeQueueSize: 512
+udpMaxPayloadSize: 1452
+
+###############################################
+# Authentication — open for MVP
+# (future: use runOnConnect + external HTTP hook)
+###############################################
+
+authMethod: internal
+authInternalUsers:
+  - user: any
+    pass:
+    ips: []
+    permissions:
+      - action: publish
+        path:
+      - action: read
+        path:
+
+###############################################
+# RTSP — internal only, used by ffmpeg hook
+###############################################
+
+rtsp: yes
+rtspAddress: :8554
+# Only allow TCP internally (no need for UDP RTSP on Fly)
+protocols: [tcp]
+# Disable encrypted RTSP — not needed internally
+rtsps: no
+
+###############################################
+# Disable unused protocols to reduce attack surface
+###############################################
+
+rtmp: no
+hls: no
+srt: no
+
+###############################################
+# WebRTC / WHIP ingestion
+###############################################
+
+webrtc: yes
+# HTTP listener port — Fly.io proxy will handle HTTPS externally
+# and forward to this internal port
+webrtcAddress: :8889
+webrtcEncryption: no
+# Open CORS so the mobile browser can publish WHIP directly
+webrtcAllowOrigin: '*'
+# Public STUN servers for ICE candidate gathering on the browser side
+webrtcICEServers2:
+  - url: stun:stun.l.google.com:19302
+  - url: stun:stun1.l.google.com:19302
+# Single UDP port mux for ICE — required for Fly.io networking
+# Fly exposes this as a UDP service (see fly.toml)
+webrtcICEUDPMuxAddress: :9000
+# NAT 1:1 mapping — REPLACE with the actual IPv4 from `fly ips allocate-v4`
+# This is the most critical setting for ICE to work behind Fly's NAT
+webrtcICEHostNAT1To1IPs: ['YOUR_FLY_PUBLIC_IPV4']
+
+###############################################
+# Paths — catch-all with runOnReady hook
+###############################################
+
+pathDefaults:
+  # When a publisher starts streaming to any path, launch ffmpeg to
+  # forward the RTSP stream to Mux via RTMP.
+  # $MTX_PATH is the stream_key sent by the browser in the WHIP URL:
+  #   POST https://bridge.fly.dev/{stream_key}/whip
+  # This same value is used as the Mux stream key — no mapping needed.
+  runOnReady: >-
+    ffmpeg
+    -i rtsp://localhost:8554/$MTX_PATH
+    -c:v copy
+    -c:a copy
+    -f flv
+    rtmp://global-live.mux.com:5222/app/$MTX_PATH
+  # Restart ffmpeg automatically if it crashes or Mux disconnects
+  runOnReadyRestart: yes
+
+paths:
+  all_others:
